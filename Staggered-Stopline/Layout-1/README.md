@@ -1,5 +1,5 @@
 # Summary
-The following files are used to simulate AV decision algorithms at intersections with staggered stop lines. The simulator uses the Australian driving convention - i.e. cars are driving on the left-hand side of the road.
+The following files are used to simulate AV decision algorithms at intersections with staggered stop lines. The simulator uses the Australian driving convention - i.e. cars are driving on the left-hand side of the road. Cross-traffic is generated as green vehicles that change to yellow or red to demonstrate how hard they are braking. The AV's field of view is displayed using a transparent triangle projecting out from the front of the blue rectangle representing the AV. Cross-traffic that is within the AV's field of view is shown as green rectangles with red circles overlaid on top.
 
 # Controls
 Arrow keys change the direction the AV is trying to drive/navigate the intersection (i.e. straight through, left turn or right turn).  
