@@ -7,30 +7,58 @@ def should_av_go(cross_traffic, av, blocker):
     req_dist_upper = 2*config.LANE_WIDTH+40+config.AV_HEIGHT # (av.y + AV_HEIGHT) - HEIGHT
     # req_time_upper = (req_dist_upper)/AV_SPEED
     req_time_upper = time_to_cover_distance(req_dist_upper, av.acceleration, config.AV_SPEED)
-    req_space_upper = req_time_upper*config.CROSS_SPEED
  
     req_dist_lower = config.LANE_WIDTH+40+config.AV_HEIGHT # (av.y + AV_HEIGHT) - HEIGHT
+
+    if av.intended_direction == 'right':
+        req_dist_lower += config.AV_HEIGHT//2
+
     # req_time_lower = (req_dist_lower)/AV_SPEED
     req_time_lower = time_to_cover_distance(req_dist_lower, av.acceleration, config.AV_SPEED)
+
     req_space_lower = req_time_lower*config.CROSS_SPEED
+    req_space_upper = req_time_upper*config.CROSS_SPEED
+ 
  
     for car in cross_traffic:
+
+        # req_space_lower = min(req_time_lower*config.CROSS_SPEED, (req_time_lower*car.vx)+(0.5*car.acceleration*req_time_lower**2))
+        # req_space_upper = min(req_time_upper*config.CROSS_SPEED, (req_time_upper*car.vx)+(0.5*car.acceleration*req_time_upper**2)) #req_time_upper math.sqrt(car.vx**2+car.vy**2)
  
         if not is_car_in_fov(car, av, blocker):
             continue  # Ignore cars outside FOV
- 
-        if car.vx > 0:
-            x_diff = (car.x+config.CAR_WIDTH//2) - (av.x-config.AV_WIDTH//2)
+
+        if car.drive_path == 'right' and car.turn_stage == 1: #car.is_in_intersection() car.direction_int[car.direction]*(car.x-config.WIDTH//2)
+            # print('[TURN STATUS] Not turning because cross traffic is in turn')
+            return False
+        
+        # if car.direction_int[car.direction]*(config.WIDTH//2-car.x) > -1*config.AV_WIDTH:
+        #     return False
+        if car.turn_stage > 1:
+            continue
+        
+        if car.vx == 0 and abs(car.vy) > config.CROSS_SPEED//2:
+            continue
+
+        if car.direction == 'right':
+            x_diff = av.x - (car.x+config.CAR_WIDTH)
         else:
-            x_diff = (car.x-config.CAR_WIDTH//2) - (av.x+config.AV_WIDTH//2)
+            x_diff = car.x - (av.x+config.AV_WIDTH)
  
         # if car.is_in_intersection(): # or abs(car.x - av.x) < req_space + AV_WIDTH:
         #     return False
-        if car.vx < 0 and x_diff > 0 and abs(x_diff) < req_space_lower + 1:
-            return False
-        elif av.intended_direction != 'left':
-            if car.vx > 0 and x_diff < 0 and abs(x_diff) < req_space_upper + 1:
+        if x_diff >= 0:
+            if car.direction == 'left' and abs(x_diff) < req_space_lower + 1:
+                # print('[TURN STATUS] Not turning because left moving traffic')
                 return False
+            elif av.intended_direction != 'left':
+                if car.direction == 'right' and abs(x_diff) < req_space_upper + 1:
+                    # print('[TURN STATUS] Not turning because right moving traffic')
+                    # print(f"[TURN STATUS] car at x: {car.x}, y: {car.y}")
+                    return False
+            
+        if config.WIDTH//2-config.CAR_WIDTH < car.x < config.WIDTH//2+config.CAR_WIDTH:
+            return False
        
     return True
 
