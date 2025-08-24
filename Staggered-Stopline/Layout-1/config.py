@@ -1,6 +1,7 @@
 import pygame
 
 # Constants
+HEADERLESS = True
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 CAR_WIDTH, CAR_HEIGHT = 40, 20  # Cross-traffic
