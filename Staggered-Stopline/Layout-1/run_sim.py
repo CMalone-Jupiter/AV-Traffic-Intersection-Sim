@@ -28,12 +28,20 @@ def run_sim(include_stationary_vehicle=False):
         stationary_vehicle = blocker_vehicle_class.StationaryVehicle(screen)
     else:
         stationary_vehicle = None
+
+    intersection_obstruction = None
+    parked_vehicle = None
     cross_traffic = []
     running = True
     deciding = False
  
     while running:
         utils.draw_roads(screen)
+
+        if av.intended_direction not in ['straight', 'right']:
+            print(f"[WARNING] AV trying to go illegal direction! ({av.intended_direction})")
+            print('[WARNING] Changing AV direction to straight.')
+            av.intended_direction = 'straight'
  
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -50,10 +58,27 @@ def run_sim(include_stationary_vehicle=False):
                 else:
                     stationary_vehicle = None
                     print("[TOGGLE] Stationary vehicle removed.")
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_o:
+                if intersection_obstruction is None:
+                    intersection_obstruction = blocker_vehicle_class.IntersectionObstruction(screen)
+                    print("[TOGGLE] Blocking object added (on right).")
+                else:
+                    intersection_obstruction = None
+                    print("[TOGGLE] Blocking object removed (on right).")
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+                if parked_vehicle is None:
+                    parked_vehicle = blocker_vehicle_class.ParkedVehicle(screen)
+                    print("[TOGGLE] Parked vehicle added (on left).")
+                else:
+                    parked_vehicle = None
+                    print("[TOGGLE] Parked vehicle removed (on left).")
  
             if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
-                av.intended_direction = 'left'
-                print("[INPUT] AV intends to turn LEFT.")
+                # av.intended_direction = 'left'
+                # print("[INPUT] AV intends to turn LEFT.")
+                print("[INPUT] AV can't turn LEFT from here!")
             if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
                 av.intended_direction = 'straight'
                 print("[INPUT] AV intends to go STRAIGHT.")
@@ -88,7 +113,9 @@ def run_sim(include_stationary_vehicle=False):
  
         # AV decision to move
         if av.manual_trigger and not av.moving and not av.collided:
-            if utils.should_av_go(cross_traffic, av, stationary_vehicle):
+            if utils.should_av_go(cross_traffic, av, [stationary_vehicle, intersection_obstruction, parked_vehicle]):
+            # if utils.should_av_go_probabilistic(cross_traffic, av, stationary_vehicle):
+            # if utils.should_av_go_hmm(cross_traffic, av, stationary_vehicle):
                 av.moving = True
                 print("[DECISION] AV proceeds through intersection.")
             else:
@@ -117,16 +144,20 @@ def run_sim(include_stationary_vehicle=False):
         av.draw()
         if stationary_vehicle is not None:
             stationary_vehicle.draw()
+        if intersection_obstruction is not None:
+            intersection_obstruction.draw()
+        if parked_vehicle is not None:
+            parked_vehicle.draw()
         
         if abs(av.vx) != config.AV_SPEED and av.turn_stage < 1:
-            fov_polygon = av.get_fov_polygon(stationary_vehicle)
+            fov_polygon = av.get_fov_polygon([stationary_vehicle, intersection_obstruction, parked_vehicle])
     
             fov_surface = pygame.Surface((config.WIDTH, config.HEIGHT), pygame.SRCALPHA)
             pygame.draw.polygon(fov_surface, (255, 255, 255, 80), fov_polygon)
             screen.blit(fov_surface, (0, 0))
         for car in cross_traffic:
             car.draw()
-            if utils.is_car_in_fov(car, av,stationary_vehicle):
+            if utils.is_car_in_fov(car, av,[stationary_vehicle, intersection_obstruction, parked_vehicle]):
                 pygame.draw.circle(screen, (255, 0, 0), car.rect.center, 5)  # small red dot
  
         status_text = font.render(
@@ -137,11 +168,17 @@ def run_sim(include_stationary_vehicle=False):
         instruction1 = font.render("Press 'B' to toggle blocking vehicle", True, (0, 0, 0))
         screen.blit(instruction1, (10, 35))
 
+        instruction1 = font.render("Press 'O' to toggle blocking object", True, (0, 0, 0))
+        screen.blit(instruction1, (10, 60))
+
+        instruction1 = font.render("Press 'P' to toggle parked vehicle", True, (0, 0, 0))
+        screen.blit(instruction1, (10, 85))
+
         instruction2 = font.render("Press Arrows to alter AV direction", True, (0, 0, 0))
-        screen.blit(instruction2, (10, 60))
+        screen.blit(instruction2, (10, 110))
 
         instruction3 = font.render("Press 'R' to reset", True, (0, 0, 0))
-        screen.blit(instruction3, (10, 85))
+        screen.blit(instruction3, (10, 135))
  
         pygame.display.flip()
         clock.tick(config.FPS)

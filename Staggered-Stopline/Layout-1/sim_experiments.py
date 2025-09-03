@@ -79,6 +79,12 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', save_fails
  
     while running:
         utils.draw_roads(screen)
+
+        if av.intended_direction not in ['straight', 'right']:
+            print(f"[WARNING] AV trying to go illegal direction! ({av.intended_direction})")
+            print('[WARNING] Changing AV direction to straight.')
+            av.intended_direction = 'straight'
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()

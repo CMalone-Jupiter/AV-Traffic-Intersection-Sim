@@ -12,4 +12,24 @@ class StationaryVehicle:
  
     def draw(self):
         pygame.draw.rect(self.screen, config.RED, self.rect)  # Green vehicle
+
+class IntersectionObstruction:
+    def __init__(self, screen):
+        self.x = config.WIDTH/2 + 1.5*config.LANE_WIDTH # + 0.75*config.AV_WIDTH  # Centered in left NB lane
+        self.y = config.HEIGHT/2 + config.LANE_WIDTH # + 0.75*config.AV_WIDTH
+        self.rect = pygame.Rect(self.x, self.y, 2*config.AV_HEIGHT, 2*config.AV_HEIGHT)
+        self.screen = screen
+ 
+    def draw(self):
+        pygame.draw.rect(self.screen, config.RED, self.rect)  # Green vehicle
+
+class ParkedVehicle:
+    def __init__(self, screen):
+        self.x = config.WIDTH/2 - 1.5*config.LANE_WIDTH - config.AV_WIDTH  # Centered in left NB lane
+        self.y = config.HEIGHT/2 + config.LANE_WIDTH + 0.75*config.AV_WIDTH
+        self.rect = pygame.Rect(self.x, self.y, config.AV_WIDTH, config.AV_HEIGHT)
+        self.screen = screen
+ 
+    def draw(self):
+        pygame.draw.rect(self.screen, config.RED, self.rect)  # Green vehicle
  
