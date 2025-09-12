@@ -9,12 +9,40 @@ import av_class
 import blocker_vehicle_class
 import cross_traffic_class
 import utils
+import ctypes
+
+on_off = ['OFF', 'ON']
+on_off_colour = [(255,0,0), (0,255,0)]
  
 pygame.init()
 screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
 pygame.display.set_caption("AV Intersection Simulator")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
+font_small = pygame.font.SysFont(None, 22)
+
+user32 = ctypes.WinDLL('user32')
+kernel32 = ctypes.WinDLL('kernel32')
+
+def focus_console():
+    hWnd = kernel32.GetConsoleWindow()
+    if hWnd:
+        user32.SetForegroundWindow(hWnd)
+
+def focus_pygame():
+    hWnd = pygame.display.get_wm_info()['window']
+    if hWnd:
+        user32.SetForegroundWindow(hWnd)
+
+def flash_screen(duration_ms=100, colour=(255,0,0)):
+    start = pygame.time.get_ticks()
+    while pygame.time.get_ticks() - start < duration_ms:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+        screen.fill(colour)
+        pygame.display.flip()
  
  
 def reset_simulation():
@@ -47,6 +75,10 @@ def run_sim(include_stationary_vehicle=False):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+                print("[INPUT] Quitting simulation.")
+                pygame.quit()
+                sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 av.manual_trigger = True
                 print("[INPUT] SPACE pressed: AV is now allowed to attempt to go.")
@@ -74,11 +106,23 @@ def run_sim(include_stationary_vehicle=False):
                 else:
                     parked_vehicle = None
                     print("[TOGGLE] Parked vehicle removed (on left).")
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+                if av.inch_behave:
+                    print("[TOGGLE] AV will no longer inch.")
+                    av.inch_behave = False
+                else:
+                    av.inch_behave = True
+                    print("[TOGGLE] AV will engage inching behaviour.")
  
             if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
                 # av.intended_direction = 'left'
                 # print("[INPUT] AV intends to turn LEFT.")
                 print("[INPUT] AV can't turn LEFT from here!")
+                flash_screen()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                print("[INPUT] AV can't go backwards!")
+                flash_screen()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
                 av.intended_direction = 'straight'
                 print("[INPUT] AV intends to go STRAIGHT.")
@@ -89,9 +133,53 @@ def run_sim(include_stationary_vehicle=False):
                 print("[INPUT] Simulation reset.")
                 reset_simulation()
 
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_s:  # Press 's' to change spawn rate
+                # new_rate = input("[INPUT] Enter desired traffic flow: ")
+                # try:
+                #     config.TRAFFIC_FLOW = float(new_rate)
+                #     print(f"[INPUT] Traffic flow updated: {config.TRAFFIC_FLOW}")
+                # except ValueError:
+                #     print("Invalid input")
+                focus_console()
+                selection = input("[INPUT] Select parameter to change (input number): \n (1) Traffic Flow \n (2) AV Speed \n (3) Cross-Traffic Speed \n (4) Exit \n Selection: ")
+                
+                if int(selection) == 1:
+                    new_rate = input("[INPUT] Enter desired traffic flow (vehicles/hour): ")
+                    try:
+                        config.TRAFFIC_FLOW = float(new_rate)
+                        print(f"[INPUT] Traffic flow updated: {config.TRAFFIC_FLOW}")
+                    except ValueError:
+                        print("[WARNING] Invalid input")
+                        flash_screen()
+                elif int(selection) == 2:
+                    new_speed = input("[INPUT] Enter desired AV top speed (kilometres/hour): ")
+                    try:
+                        config.AV_SPEED = int((100*float(new_speed)/3.6)/(config.FPS*8))
+                        print(f"[INPUT] AV top speed updated: {(3.6*config.AV_SPEED*config.FPS*8)/100}")
+                        print(f"Disclaimer: rounding due to pixel size may round set speed")
+                    except ValueError:
+                        print("[WARNING] Invalid input")
+                        flash_screen()
+                elif int(selection) == 3:
+                    new_speed = input("[INPUT] Enter desired cross-traffic top speed (kilometres/hour): ")
+                    try:
+                        config.CROSS_SPEED = int((100*float(new_speed)/3.6)/(config.FPS*8))
+                        print(f"[INPUT] Cross-traffic top speed updated: {(3.6*config.CROSS_SPEED*config.FPS*8)/100}")
+                        print(f"Disclaimer: rounding due to pixel size may round set speed")
+                    except ValueError:
+                        print("[WARNING] Invalid input")
+                        flash_screen()
+                elif int(selection) == 4:
+                    print("[INPUT] Back to simulator.")
+                else:
+                    print("[WARNING] Invalid input")
+                    flash_screen()
+
+                focus_pygame()
+
  
         # Spawn cross traffic
-        if random.random() < config.SPAWN_RATE:
+        if random.random() < (config.TRAFFIC_FLOW/3600)/config.FPS:
             direction = random.choice(['left', 'right'])
             # cross_traffic.append(CrossTrafficCar(direction))
             new_car = cross_traffic_class.CrossTrafficCar(direction, screen)
@@ -160,26 +248,94 @@ def run_sim(include_stationary_vehicle=False):
             if utils.is_car_in_fov(car, av,[stationary_vehicle, intersection_obstruction, parked_vehicle]):
                 pygame.draw.circle(screen, (255, 0, 0), car.rect.center, 5)  # small red dot
  
+        if av.moving:
+            decision_status = 'MOVING'
+        elif av.manual_trigger:
+            decision_status = 'WAITING'
+        else:
+            decision_status = 'STOPPED'
         status_text = font.render(
-            f"AV {'MOVING' if av.moving else 'WAITING'} | Press SPACE to GO", True, (0, 0, 0)
+            f"AV {decision_status} | Press SPACE to GO", True, (0, 0, 0)
         )
         screen.blit(status_text, (10, 10))
         # Additional instructions
-        instruction1 = font.render("Press 'B' to toggle blocking vehicle", True, (0, 0, 0))
+        ############################
+        sample = font_small.render(f"Press 'I' to toggle inching behaviour ", True, (0, 0, 0))
+        on_off_start = 10+sample.get_width()
+        ############################
+        instruction1 = font_small.render(f"Press 'B' to toggle blocking vehicle ", True, (0, 0, 0))
+        instruction1_start = font_small.render(f"[", True, (0, 0, 0))
+        instruction1_on = font_small.render(f"{on_off[int(stationary_vehicle is not None)]}", True, on_off_colour[int(stationary_vehicle is not None)])
+        instruction1_end = font_small.render(f"]", True, (0, 0, 0))
         screen.blit(instruction1, (10, 35))
+        screen.blit(instruction1_start, (on_off_start, 35))
+        screen.blit(instruction1_on, (on_off_start+instruction1_start.get_width(), 35))
+        screen.blit(instruction1_end, (on_off_start+instruction1_start.get_width()+instruction1_on.get_width(), 35))
 
-        instruction1 = font.render("Press 'O' to toggle blocking object", True, (0, 0, 0))
-        screen.blit(instruction1, (10, 60))
+        instruction1 = font_small.render(f"Press 'O' to toggle blocking object ", True, (0, 0, 0))
+        # screen.blit(instruction1, (10, 60))
+        instruction1_start = font_small.render(f"[", True, (0, 0, 0))
+        instruction1_on = font_small.render(f"{on_off[int(intersection_obstruction is not None)]}", True, on_off_colour[int(intersection_obstruction is not None)])
+        instruction1_end = font_small.render(f"]", True, (0, 0, 0))
+        screen.blit(instruction1, (10, 55))
+        screen.blit(instruction1_start, (on_off_start, 55))
+        screen.blit(instruction1_on, (on_off_start+instruction1_start.get_width(), 55))
+        screen.blit(instruction1_end, (on_off_start+instruction1_start.get_width()+instruction1_on.get_width(), 55))
 
-        instruction1 = font.render("Press 'P' to toggle parked vehicle", True, (0, 0, 0))
-        screen.blit(instruction1, (10, 85))
+        instruction1 = font_small.render(f"Press 'P' to toggle parked vehicle ", True, (0, 0, 0))
+        # screen.blit(instruction1, (10, 85))
+        instruction1_start = font_small.render(f"[", True, (0, 0, 0))
+        instruction1_on = font_small.render(f"{on_off[int(parked_vehicle is not None)]}", True, on_off_colour[int(parked_vehicle is not None)])
+        instruction1_end = font_small.render(f"]", True, (0, 0, 0))
+        screen.blit(instruction1, (10, 75))
+        screen.blit(instruction1_start, (on_off_start, 75))
+        screen.blit(instruction1_on, (on_off_start+instruction1_start.get_width(), 75))
+        screen.blit(instruction1_end, (on_off_start+instruction1_start.get_width()+instruction1_on.get_width(), 75))
 
-        instruction2 = font.render("Press Arrows to alter AV direction", True, (0, 0, 0))
-        screen.blit(instruction2, (10, 110))
+        instruction1 = font_small.render(f"Press 'I' to toggle inching behaviour ", True, (0, 0, 0))
+        # screen.blit(instruction1, (10, 110))
+        instruction1_start = font_small.render(f"[", True, (0, 0, 0))
+        instruction1_on = font_small.render(f"{on_off[int(av.inch_behave)]}", True, on_off_colour[int(av.inch_behave)])
+        instruction1_end = font_small.render(f"]", True, (0, 0, 0))
+        screen.blit(instruction1, (10, 95))
+        screen.blit(instruction1_start, (on_off_start, 95))
+        screen.blit(instruction1_on, (on_off_start+instruction1_start.get_width(), 95))
+        screen.blit(instruction1_end, (on_off_start+instruction1_start.get_width()+instruction1_on.get_width(), 95))
+
+        instruction2 = font_small.render(f"Press Arrows to alter AV path ", True, (0, 0, 0))
+        screen.blit(instruction2, (10, 115))
+        instruction2_ = font_small.render(f"[{av.intended_direction.capitalize()}]", True, (0, 0, 0))
+        screen.blit(instruction2_, (28+instruction2.get_width(), 115))
 
         instruction3 = font.render("Press 'R' to reset", True, (0, 0, 0))
-        screen.blit(instruction3, (10, 135))
- 
+        # screen.blit(instruction3, (10, 135))
+        screen.blit(instruction3, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 35))
+
+        instruction5 = font.render("Press 'Q' to quit", True, (0, 0, 0))
+        # screen.blit(instruction3, (10, 135))
+        screen.blit(instruction5, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 60))
+
+        #####################
+        sample = font_small.render(f"(3) Cross-Traffic Speed ", True, (0, 0, 0))
+        param_x = 30+config.WIDTH//2+int(2*config.LANE_WIDTH)+sample.get_width()
+        #####################
+
+        instruction4 = font.render(f"Press 'S' to change:", True, (0, 0, 0))
+        screen.blit(instruction4, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 85))
+        instruction4_ = font_small.render(f"(1) Traffic Flow", True, (0, 0, 0))
+        screen.blit(instruction4_, (30+config.WIDTH//2+int(2*config.LANE_WIDTH), 105))
+        instruction4_ = font_small.render(f"[{config.TRAFFIC_FLOW} v/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 105))
+        instruction4_ = font_small.render(f"(2) AV Speed", True, (0, 0, 0))
+        screen.blit(instruction4_, (30+config.WIDTH//2+int(2*config.LANE_WIDTH), 125))
+        instruction4_ = font_small.render(f"[{(config.AV_SPEED*8*config.FPS*3.6)/100:.0f} km/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 125))
+        instruction4_ = font_small.render(f"(3) Cross-Traffic Speed", True, (0, 0, 0))
+        screen.blit(instruction4_, (30+config.WIDTH//2+int(2*config.LANE_WIDTH), 145))
+        instruction4_ = font_small.render(f"[{(config.CROSS_SPEED*8*config.FPS*3.6)/100:.0f} km/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 145))
+        # int((100*float(new_speed)/3.6)/(config.FPS*8))
+
         pygame.display.flip()
         clock.tick(config.FPS)
  

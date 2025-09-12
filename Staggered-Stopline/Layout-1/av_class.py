@@ -15,6 +15,7 @@ class AutonomousVehicle:
         self.rect = pygame.Rect(self.x, self.y, config.AV_WIDTH, config.AV_HEIGHT)
         self.moving = False
         self.inching = False
+        self.inch_behave = False
         self.collided = False
         self.manual_trigger = False
         self.intended_direction = 'straight'  # Options: 'left', 'straight', 'right'
@@ -149,7 +150,7 @@ class AutonomousVehicle:
             self.rect.x = self.x
             self.rect.y = self.y
 
-        elif self.inching:
+        elif self.inching and self.inch_behave:
 
             if self.rect.top < (config.HEIGHT//2 + config.LANE_WIDTH):
                 print("[DECISION] AV has reached the edge of the intersection and must stop.")

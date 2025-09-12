@@ -24,15 +24,16 @@ def should_av_go(cross_traffic, av, blocker):
     visible_range_lower = abs((av.rect.left + config.AV_WIDTH) - visible_x_range_at_y(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2)[1])
     visible_range_upper = abs(av.rect.left - visible_x_range_at_y(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2)[0])
 
-    if visible_range_lower < req_space_lower or visible_range_upper < req_space_upper:
-        if not av.inching:
-            print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
-            av.inching = True
-        return False
-    else:
-        if av.inching:
-            print("[DECISION] FOV is sufficient, stopping inching behaviour.")
-            av.inching = False
+    if av.inch_behave:
+        if visible_range_lower < req_space_lower or visible_range_upper < req_space_upper:
+            if not av.inching:
+                print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
+                av.inching = True
+            return False
+        else:
+            if av.inching:
+                print("[DECISION] FOV is sufficient, stopping inching behaviour.")
+                av.inching = False
  
     for car in cross_traffic:
 
