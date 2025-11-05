@@ -334,6 +334,21 @@ def draw_roads(screen):
  
     # Intersection box
     pygame.draw.rect(screen, config.BLACK, config.INTERSECTION_BOX, 2)
+
+    # Draw cross (horizontal and vertical lines)
+    # cross_size = 5
+    # pygame.draw.line(screen, config.WHITE, (config.WIDTH//2 - cross_size, config.HEIGHT//2), (config.WIDTH//2 + cross_size, config.HEIGHT//2), 2)
+    # pygame.draw.line(screen, config.WHITE, (config.WIDTH//2, config.HEIGHT//2 - cross_size), (config.WIDTH//2, config.HEIGHT//2 + cross_size), 2)
+
+    # Draw conflict zones
+    # Create a surface with alpha for transparency
+    alpha = 128
+    rect_surface = pygame.Surface((config.LANE_WIDTH, config.LANE_WIDTH), pygame.SRCALPHA)  # allow alpha
+    rect_surface.fill((*config.ORANGE, alpha))  # RGBA
+    screen.blit(rect_surface, (config.LOWER_CONFLICT_ZONE[0], config.LOWER_CONFLICT_ZONE[2]))
+    pygame.draw.rect(screen, config.DARK_ORANGE, (*(config.LOWER_CONFLICT_ZONE[0], config.LOWER_CONFLICT_ZONE[2]), *(config.LANE_WIDTH, config.LANE_WIDTH)), width=2)
+    screen.blit(rect_surface, (config.UPPER_CONFLICT_ZONE[0], config.UPPER_CONFLICT_ZONE[2]))
+    pygame.draw.rect(screen, config.DARK_ORANGE, (*(config.UPPER_CONFLICT_ZONE[0], config.UPPER_CONFLICT_ZONE[2]), *(config.LANE_WIDTH, config.LANE_WIDTH)), width=2)
  
     # Dashed lane dividers (vertical)
     for y in range(0, config.HEIGHT, 40):
