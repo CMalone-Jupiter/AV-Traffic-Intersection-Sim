@@ -5,6 +5,72 @@ from matplotlib.path import Path
 import config
 import numpy as np
 
+def travel_time(distance, v0, a, vmax):
+    """
+    Calculate the time it takes for a car to travel a given distance
+    with an initial velocity v0, constant acceleration a, and a maximum velocity vmax.
+
+    Parameters:
+        distance (float): distance to travel (m)
+        v0 (float): initial velocity (m/s)
+        a (float): acceleration (m/s^2)
+        vmax (float): maximum velocity (m/s)
+
+    Returns:
+        float: total time to travel the distance (s)
+    """
+    # Distance required to reach vmax
+    d_accel = (vmax**2 - v0**2) / (2 * a)
+
+    if distance <= d_accel:
+        # Case 1: does not reach vmax
+        vf = math.sqrt(v0**2 + 2 * a * distance)
+        t = (vf - v0) / a
+    else:
+        # Case 2: reaches vmax, then cruises
+        t_accel = (vmax - v0) / a
+        d_cruise = distance - d_accel
+        t_cruise = d_cruise / vmax
+        t = t_accel + t_cruise
+
+    return t
+
+def should_av_go_col_zone(cross_traffic, av, blocker):
+
+    for car in cross_traffic:
+        if not is_car_in_fov(car, av, blocker):
+            continue  # Ignore cars outside FOV
+
+        # if car.drive_path == 'right' and car.turn_stage == 1: #car.is_in_intersection() car.direction_int[car.direction]*(car.x-config.WIDTH//2)
+        #     # print('[TURN STATUS] Not turning because cross traffic is in turn')
+        #     return False
+        
+        # # if car.direction_int[car.direction]*(config.WIDTH//2-car.x) > -1*config.AV_WIDTH:
+        # #     return False
+        # if car.turn_stage > 1:
+        #     continue
+        
+        # if car.vx == 0 and abs(car.vy) > config.CROSS_SPEED//2:
+        #     continue
+    
+        if car.direction == 'left':
+            if car.drive_path != 'left' and (car.x+config.CAR_WIDTH) > config.LOWER_CONFLICT_ZONE[0]:
+                car_t1 = travel_time(abs(car.x-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+                car_t2 = travel_time(abs((car.x+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+
+                if av.col_zone_times[0,0] < car_t2 and car_t1 < av.col_zone_times[0,1]:
+                    return False
+        else:
+            if car.drive_path != 'left' and car.x < config.UPPER_CONFLICT_ZONE[1]:
+                car_t1 = travel_time(abs((car.x+config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+                car_t2 = travel_time(abs(car.x-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+
+                if av.col_zone_times[1,0] < car_t2 and car_t1 < av.col_zone_times[1,1]:
+                    return False
+
+    return True
+
+
 def should_av_go(cross_traffic, av, blocker):
     req_dist_upper = 2*config.LANE_WIDTH+40+config.AV_HEIGHT # (av.y + AV_HEIGHT) - HEIGHT
     # req_time_upper = (req_dist_upper)/AV_SPEED

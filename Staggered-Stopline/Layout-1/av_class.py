@@ -2,6 +2,7 @@ import pygame
 import math
 import config
 import numpy as np
+from utils import travel_time
 
 class AutonomousVehicle:
     def __init__(self, screen):
@@ -25,6 +26,7 @@ class AutonomousVehicle:
         self.max_v_x = False
         self.max_v_y = False
         self.turn_stage = 0
+        self.col_zone_times = np.array([[0,1000], [0, 1000]])
         self.screen = screen
  
     def update(self):
@@ -166,6 +168,12 @@ class AutonomousVehicle:
 
                 self.rect.x = self.x
                 self.rect.y = self.y
+
+        if self.y-config.LOWER_CONFLICT_ZONE[3] > 0:
+            self.col_zone_times[0,0] = travel_time(self.y-config.LOWER_CONFLICT_ZONE[3], abs(self.vy), abs(self.acceleration), config.AV_SPEED)
+            self.col_zone_times[0,1] = travel_time((self.y+config.AV_HEIGHT)-config.LOWER_CONFLICT_ZONE[2], abs(self.vy), abs(self.acceleration), config.AV_SPEED)
+            self.col_zone_times[1,0] = travel_time(self.y-config.UPPER_CONFLICT_ZONE[3], abs(self.vy), abs(self.acceleration), config.AV_SPEED)
+            self.col_zone_times[1,1] = travel_time((self.y+config.AV_HEIGHT)-config.UPPER_CONFLICT_ZONE[2], abs(self.vy), abs(self.acceleration), config.AV_SPEED)
 
 
 

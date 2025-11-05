@@ -201,7 +201,7 @@ def run_sim(include_stationary_vehicle=False):
  
         # AV decision to move
         if av.manual_trigger and not av.moving and not av.collided:
-            if utils.should_av_go(cross_traffic, av, [stationary_vehicle, intersection_obstruction, parked_vehicle]):
+            if utils.should_av_go_col_zone(cross_traffic, av, [stationary_vehicle, intersection_obstruction, parked_vehicle]):
             # if utils.should_av_go_probabilistic(cross_traffic, av, stationary_vehicle):
             # if utils.should_av_go_hmm(cross_traffic, av, stationary_vehicle):
                 av.moving = True
@@ -335,6 +335,10 @@ def run_sim(include_stationary_vehicle=False):
         instruction4_ = font_small.render(f"[{(config.CROSS_SPEED*8*config.FPS*3.6)/100:.0f} km/hr]", True, (0, 0, 0))
         screen.blit(instruction4_, (param_x, 145))
         # int((100*float(new_speed)/3.6)/(config.FPS*8))
+        instruction4_ = font_small.render(f"Col Zone 1 Times: [{av.col_zone_times[0,0]}, {av.col_zone_times[0,1]}]", True, (0, 0, 0))
+        screen.blit(instruction4_, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 170))
+        instruction4_ = font_small.render(f"Col Zone 2 Times [{av.col_zone_times[1,0]}, {av.col_zone_times[1,1]}]:", True, (0, 0, 0))
+        screen.blit(instruction4_, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 195))
 
         pygame.display.flip()
         clock.tick(config.FPS)
