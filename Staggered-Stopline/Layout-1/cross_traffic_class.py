@@ -453,6 +453,41 @@ class CrossTrafficCar:
             
         rotated_image = pygame.Surface((config.CAR_WIDTH, config.CAR_HEIGHT), pygame.SRCALPHA)
         pygame.draw.rect(rotated_image, color, (0, 0, config.CAR_WIDTH, config.CAR_HEIGHT))
+
+        if self.drive_path != 'straight' and self.turn_stage < 1:
+            # Add a small orange square to indicate turning direction
+            indicator_size = 6
+            orange = (255, 165, 0)
+
+            w = config.CAR_WIDTH
+            h = config.CAR_HEIGHT
+            s = indicator_size
+
+            # Precompute valid corner positions (x, y) for the indicator
+            corners = {
+                'top_left':     (0, 0),
+                'top_right':    (w - s, 0),
+                'bottom_left':  (0, h - s),
+                'bottom_right': (w - s, h - s),
+            }
+
+            # Choose corner according to drive_path and travel direction.
+            # This preserves your original mapping but avoids arithmetic that can go negative.
+            if self.drive_path == 'left':
+                if self.direction == 'left':
+                    chosen = 'bottom_left'   # moving left, turning left
+                else:
+                    chosen = 'top_right'     # moving other direction, turning left
+            else:  # drive_path == 'right'
+                if self.direction == 'left':
+                    chosen = 'top_left'  # moving left, turning right
+                else:
+                    chosen = 'bottom_right'      # moving other direction, turning right
+
+            indicator_x, indicator_y = corners[chosen]
+
+            # Draw indicator
+            pygame.draw.rect(rotated_image, orange, (indicator_x, indicator_y, s, s))
  
         # Determine angle based on motion
         if self.drive_path in ('left', 'right') and self.turn_angle is not None:
