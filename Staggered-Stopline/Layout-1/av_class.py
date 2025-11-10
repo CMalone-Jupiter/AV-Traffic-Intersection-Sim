@@ -253,7 +253,7 @@ class AutonomousVehicle:
 
 ################################################################################
 
-    def get_fov_polygon(self, blockers=None, fov_deg=179, fov_height=140, ray_density=4):
+    def get_fov_polygon(self, blockers=None, fov_deg=179, fov_height=140, ray_density=6):
         """
         Returns a polygon representing the FOV, clipped by blockers.
         ray_density: angular resolution in degrees (smaller = more precise).

@@ -37,21 +37,46 @@ def travel_time(distance, v0, a, vmax):
 
 def should_av_go_col_zone(cross_traffic, av, blocker):
 
+    # visible_range_lower = visible_x_range_at_y(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2)[1]
+    # visible_range_upper = visible_x_range_at_y(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2)[0]
+    # print(f"{visible_range_lower}, {visible_range_upper}")
+    visible_range_lower = poly_find_x(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2, side='right')
+    visible_range_upper = poly_find_x(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2, side='left')
+    # print(f"{visible_range_lower}, {visible_range_upper}")
+
+        # Check cars at limits of visible x range
+    # 
+    if visible_range_lower < 0.75*config.WIDTH:            
+        car_t1 = travel_time(abs(visible_range_lower-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+        car_t2 = travel_time(abs((visible_range_lower+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+
+        if av.col_zone_times[0,0] < car_t2 and car_t1 < av.col_zone_times[0,1]:
+            if av.inch_behave and not av.inching:
+                print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
+                av.inching = True
+            return False
+    
+    if visible_range_upper > 0.25*config.WIDTH:
+        car_t1 = travel_time(abs((visible_range_upper)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+        car_t2 = travel_time(abs((visible_range_upper-config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+
+        if av.col_zone_times[1,0] < car_t2 and car_t1 < av.col_zone_times[1,1]:
+            if av.inch_behave and not av.inching:
+                print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
+                av.inching = True
+            return False
+    
+    if av.inching:
+        print("[DECISION] FOV is sufficient, stopping inching behaviour.")
+        av.inching = False
+        return False
+
+
     for car in cross_traffic:
         if not is_car_in_fov(car, av, blocker):
             continue  # Ignore cars outside FOV
-
-        # if car.drive_path == 'right' and car.turn_stage == 1: #car.is_in_intersection() car.direction_int[car.direction]*(car.x-config.WIDTH//2)
-        #     # print('[TURN STATUS] Not turning because cross traffic is in turn')
-        #     return False
-        
-        # # if car.direction_int[car.direction]*(config.WIDTH//2-car.x) > -1*config.AV_WIDTH:
-        # #     return False
-        # if car.turn_stage > 1:
-        #     continue
-        
-        # if car.vx == 0 and abs(car.vy) > config.CROSS_SPEED//2:
-        #     continue
+        if car.is_in_intersection() and car.turn_stage < 2:
+            return False
     
         if car.direction == 'left':
             if car.drive_path != 'left' and (car.x+config.CAR_WIDTH) > config.LOWER_CONFLICT_ZONE[0]:
@@ -511,3 +536,88 @@ def visible_x_range_at_y(av, blockers, target_y):
 
     intersections.sort()
     return (intersections[0], intersections[-1])  # min and max visible x
+
+# def intersect_x(p1, p2, target_y):
+#     (x1, y1), (x2, y2) = p1, p2
+#     # Avoid division by zero if line is horizontal
+#     if y2 == y1:
+#         return None
+#     # Linear interpolation: find x where y = target_y
+#     t = (target_y - y1) / (y2 - y1)
+#     x = x1 + t * (x2 - x1)
+#     return x
+
+# def poly_find_x(av, blockers, target_y, side='left'):
+#     polygon = av.get_fov_polygon(blockers=blockers)
+
+#     # Split screen into left and right halves
+#     mid_x = config.WIDTH / 2
+
+#     # Separate points
+
+#     if side =='left':
+#         left_points = [p for p in polygon if p[0] <= mid_x]
+#         # Find the lowest (highest y value) in each half
+#         lowest_left = max(left_points, key=lambda p: p[1]) if left_points else None
+#         x_point = intersect_x((av.x, av.y), lowest_left, target_y) if lowest_left else None
+#     else:
+#         right_points = [p for p in polygon if p[0] > mid_x]
+#         lowest_right = max(right_points, key=lambda p: p[1]) if right_points else None
+#         x_point = intersect_x((av.x, av.y), lowest_right, target_y) if lowest_right else None
+#         print(lowest_right)
+
+#     return x_point
+
+def poly_find_x(av, blockers, target_y, side='left'):
+    """
+    Find x position at target_y along the line from (av.x,av.y) to either:
+      - the leftmost polygon vertex (side='left'), or
+      - the rightmost polygon vertex (side='right').
+    If multiple vertices share the same extreme x, choose the one with largest y.
+    Returns x (float) or None if no valid intersection on the segment.
+    """
+    polygon = av.get_fov_polygon(blockers=blockers)
+    if not polygon:
+        return None
+
+    # choose extreme x: left -> min x, right -> max x
+    if side == 'left':
+        extreme_x = min(p[0] for p in polygon)
+    else:
+        extreme_x = max(p[0] for p in polygon)
+
+    # collect points that have that extreme x (handle floating precision with exact match as per user data)
+    extreme_points = [p for p in polygon if p[0] == extreme_x]
+
+    # if none matched exactly (rare with floats), fallback to nearest
+    if not extreme_points:
+        # find closest to extreme_x
+        best = min(polygon, key=lambda p: abs(p[0] - extreme_x))
+        extreme_points = [best]
+
+    # from those, pick the lowest (largest y)
+    target_point = max(extreme_points, key=lambda p: p[1])  # (x2,y2)
+
+    x1, y1 = av.x, av.y
+    x2, y2 = target_point
+
+    # helper: check if target_y lies between y1 and y2 inclusive
+    def y_between(y, a, b):
+        return min(a, b) <= y <= max(a, b)
+
+    # handle horizontal segment
+    if y2 == y1:
+        return x1 if target_y == y1 else None
+
+    # require the horizontal line at target_y to intersect the segment between (x1,y1) and (x2,y2)
+    if not y_between(target_y, y1, y2):
+        return None
+
+    # if vertical segment (x1 == x2), intersection x is just that x
+    if x2 == x1:
+        return x1
+
+    # linear interpolation to find x at target_y
+    t = (target_y - y1) / (y2 - y1)  # guaranteed not divide by zero because y2 != y1
+    x_at_target = x1 + t * (x2 - x1)
+    return x_at_target
