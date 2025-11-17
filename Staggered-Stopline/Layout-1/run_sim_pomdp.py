@@ -191,7 +191,12 @@ def run_sim(include_stationary_vehicle=False):
 
                 focus_pygame()
 
- 
+        pomdp_agent.transition_model.config.enable_creep_improvement = av.inch_behave
+        pomdp_agent.policy.config.enable_creep_improvement = av.inch_behave
+        pomdp_agent.observation_model.config.enable_creep_improvement = av.inch_behave
+        pomdp_agent.reward_model.config.enable_creep_improvement = av.inch_behave
+        pomdp_agent.config.enable_creep_improvement = av.inch_behave
+
         # Spawn cross traffic
         if random.random() < (config.TRAFFIC_FLOW/3600)/config.FPS:
             direction = random.choice(['left', 'right'])

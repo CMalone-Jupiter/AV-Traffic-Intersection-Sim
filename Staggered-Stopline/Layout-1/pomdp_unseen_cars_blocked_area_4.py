@@ -303,7 +303,27 @@ class POMDPPolicy(pomdp_py.RolloutPolicy):
         # BEFORE EDGE
         else:
             # BEFORE EDGE
-            return ACT_CREEP
+            if cfg.enable_creep_improvement:
+                return ACT_CREEP
+            else:
+                # Decision criteria at edge 
+                # Wait minimum steps
+                if self.step_count < cfg.min_steps_before_go:
+                    return ACT_STOP
+                
+                # Check if VERY safe to GO
+                if prob_low > 0.85 and prob_high < 0.10:
+                    return ACT_GO
+                
+                # Check if waited too long
+                if self.step_count > cfg.max_info_gathering_steps:
+                    if prob_high < 0.3 and prob_low > 0.50:
+                        return ACT_GO
+                    else:
+                        return ACT_STOP
+                
+            
+                return ACT_STOP
     
     def rollout(self, state, history=None):
         return random.choice(list(ALL_ACTIONS))
