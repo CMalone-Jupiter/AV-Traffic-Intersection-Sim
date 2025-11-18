@@ -10,7 +10,7 @@ import utils
 import ctypes
 
 # Import POMDP components
-from pomdp_unseen_cars_blocked_area_4 import UnseenCarPOMDPAgent, should_av_go_pomdp
+from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_pomdp
 
 on_off = ['OFF', 'ON']
 on_off_colour = [(255,0,0), (0,255,0)]
@@ -60,8 +60,8 @@ def run_sim(include_stationary_vehicle=False):
     pomdp_agent = UnseenCarPOMDPAgent()
     print(f"[INIT] POMDP Agent initialized")
     print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
-    print(f"[CONFIG] unseen_car_danger_weight = {pomdp_agent.config.unseen_car_danger_weight}")
-    print(f"[CONFIG] confidence_threshold_go = {pomdp_agent.config.confidence_threshold_go}")
+    # print(f"[CONFIG] unseen_car_danger_weight = {pomdp_agent.config.unseen_car_danger_weight}")
+    # print(f"[CONFIG] confidence_threshold_go = {pomdp_agent.config.confidence_threshold_go}")
     
     av = av_class.AutonomousVehicle(screen)
     if include_stationary_vehicle:
@@ -90,15 +90,15 @@ def run_sim(include_stationary_vehicle=False):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
                 print("[INPUT] Quitting simulation.")
                 # Print POMDP statistics before quitting
-                summary = pomdp_agent.get_unseen_car_summary()
-                if summary['active']:
-                    print("\n" + "="*60)
-                    print("POMDP STATISTICS")
-                    print("="*60)
-                    print(f"Unseen car model activations: {summary['num_activations']}")
-                    print(f"Total danger added: {summary['total_danger_added']:.1f}")
-                    print(f"Average danger per activation: {summary['avg_danger_per_activation']:.1f}")
-                    print("="*60)
+                # summary = pomdp_agent.get_unseen_car_summary()
+                # if summary['active']:
+                #     print("\n" + "="*60)
+                #     print("POMDP STATISTICS")
+                #     print("="*60)
+                #     print(f"Unseen car model activations: {summary['num_activations']}")
+                #     print(f"Total danger added: {summary['total_danger_added']:.1f}")
+                #     print(f"Average danger per activation: {summary['avg_danger_per_activation']:.1f}")
+                #     print("="*60)
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
@@ -244,22 +244,22 @@ def run_sim(include_stationary_vehicle=False):
                 car.draw()
             pygame.display.flip()
             print("\n[COLLISION DETECTED]")
-            # Print POMDP statistics
-            summary = pomdp_agent.get_unseen_car_summary()
-            if summary['active']:
-                print(f"  Unseen car model was active")
-                print(f"  Activations: {summary['num_activations']}")
-                print(f"  Total danger added: {summary['total_danger_added']:.1f}")
+            # # Print POMDP statistics
+            # summary = pomdp_agent.get_unseen_car_summary()
+            # if summary['active']:
+            #     print(f"  Unseen car model was active")
+            #     print(f"  Activations: {summary['num_activations']}")
+            #     print(f"  Total danger added: {summary['total_danger_added']:.1f}")
             reset_simulation()
  
         # Check for success (AV fully exited top of screen)
         if av.y + config.AV_HEIGHT < 250 or av.x < 0 or av.x > config.WIDTH:
             print("[SUCCESS] AV successfully crossed the intersection!")
             # Print POMDP statistics
-            summary = pomdp_agent.get_unseen_car_summary()
-            if summary['active']:
-                print(f"[STATS] Unseen car model helped navigate occlusion")
-                print(f"[STATS] Activations: {summary['num_activations']}")
+            # summary = pomdp_agent.get_unseen_car_summary()
+            # if summary['active']:
+            #     print(f"[STATS] Unseen car model helped navigate occlusion")
+            #     print(f"[STATS] Activations: {summary['num_activations']}")
             reset_simulation()
  
         av.draw()
@@ -364,11 +364,11 @@ def run_sim(include_stationary_vehicle=False):
         screen.blit(instruction4_, (param_x, 145))
         
         # Display POMDP info
-        belief_text = font_small.render(f"POMDP Belief: {pomdp_agent.policy.get_belief_summary(pomdp_agent.belief)}", True, (0, 0, 0))
-        screen.blit(belief_text, (10, config.HEIGHT - 45))
+        # belief_text = font_small.render(f"POMDP Belief: {pomdp_agent.policy.get_belief_summary(pomdp_agent.belief)}", True, (0, 0, 0))
+        # screen.blit(belief_text, (10, config.HEIGHT - 45))
         
-        step_text = font_small.render(f"POMDP Steps: {pomdp_agent.policy.step_count}", True, (0, 0, 0))
-        screen.blit(step_text, (10, config.HEIGHT - 25))
+        # step_text = font_small.render(f"POMDP Steps: {pomdp_agent.policy.step_count}", True, (0, 0, 0))
+        # screen.blit(step_text, (10, config.HEIGHT - 25))
 
         pygame.display.flip()
         clock.tick(config.FPS)
