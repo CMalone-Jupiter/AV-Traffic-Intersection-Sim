@@ -12,7 +12,8 @@ from utils import (
     travel_time,
     is_car_in_fov,
     time_to_cover_distance,
-    should_av_go_col_zone
+    should_av_go_col_zone,
+    poly_find_x
 )
 
 
@@ -166,7 +167,9 @@ class FOVCache:
             return self._cache[cache_key]
         
         # Compute FOV info
-        fov_polygon = av.get_fov_polygon(blockers)
+        # fov_polygon = av.get_fov_polygon(blockers)
+        visible_range_lower, fov_polygon = poly_find_x(av, blockers, config.HEIGHT/2+config.LANE_WIDTH/2, side='right')
+        visible_range_upper, fov_polygon = poly_find_x(av, blockers, config.HEIGHT/2-config.LANE_WIDTH/2, side='left')
         
         if len(fov_polygon) < 3:
             info = {
@@ -179,16 +182,19 @@ class FOVCache:
                 "right_blocked": True
             }
         else:
-            fov_points = fov_polygon[1:]
-            left_x = min(pt[0] for pt in fov_points)
-            right_x = max(pt[0] for pt in fov_points)
+            # fov_points = fov_polygon[1:]
+            # left_x = min(pt[0] for pt in fov_points)
+            # right_x = max(pt[0] for pt in fov_points)
+            left_x = float(max(0, visible_range_upper))
+            right_x = float(min(config.WIDTH, visible_range_lower))
             fov_width = right_x - left_x
             
-            expected_fov_width = config.WIDTH * 0.7
-            visibility_ratio = fov_width / expected_fov_width
+            expected_fov_width = config.WIDTH * 0.5
+            visibility_ratio = max(left_x/(0.25*config.WIDTH), (config.WIDTH-right_x)/(config.WIDTH-0.75*config.WIDTH))
+            # print(f"left: {left_x}, right: {right_x}, visibility: {visibility_ratio}")
             
-            expected_left = config.WIDTH * 0.15
-            expected_right = config.WIDTH * 0.85
+            # expected_left = config.WIDTH * 0.15
+            # expected_right = config.WIDTH * 0.85
             
             info = {
                 "valid": True,
@@ -196,10 +202,10 @@ class FOVCache:
                 "visibility_ratio": visibility_ratio,
                 "left_edge_x": left_x,
                 "right_edge_x": right_x,
-                "left_blocked": left_x > (expected_left + 50),
-                "right_blocked": right_x < (expected_right - 50),
-                "left_hidden_width": max(0, left_x - expected_left),
-                "right_hidden_width": max(0, expected_right - right_x)
+                "left_blocked": left_x > 0.25*config.WIDTH,
+                "right_blocked": right_x < 0.75*config.WIDTH
+                # "left_hidden_width": max(0, left_x - expected_left),
+                # "right_hidden_width": max(0, expected_right - right_x)
             }
         
         # Cache with size limit
@@ -431,7 +437,7 @@ class POMDPPolicy(pomdp_py.RolloutPolicy):
             # **NEW LOGIC: Only creep after delay AND if FOV is sufficiently blocked*
             
             # Check if FOV is blocked enough to warrant creeping
-            fov_blocked = fov_visibility < cfg.min_fov_blockage_for_creep
+            fov_blocked = fov_visibility > 1
             
             # Track consecutive blocked steps
             if fov_blocked:
@@ -453,14 +459,28 @@ class POMDPPolicy(pomdp_py.RolloutPolicy):
             # 1. FOV is blocked enough
             # 2. We've been blocked for enough steps
             # 3. We're not too confident it's already safe
-            if (fov_blocked and 
-                self.steps_blocked >= cfg.creep_delay_steps and
-                prob_low < 0.80):
-                return ACT_CREEP
+            if (fov_blocked):
+                if (self.steps_blocked >= cfg.creep_delay_steps and prob_low < 0.80):
+                    return ACT_CREEP
+                else:
+                    return ACT_STOP
             else:
+                if self.step_count < cfg.min_steps_before_go:
+                    return ACT_STOP
+                
+                # High confidence to go
+                if prob_low > 0.85 and prob_high < 0.10:
+                    return ACT_GO
+                
+                # Timeout check
+                if self.step_count > cfg.max_info_gathering_steps:
+                    if prob_high < 0.3 and prob_low > 0.50:
+                        return ACT_GO
+                
                 return ACT_STOP
         else:
             # No creeping - use same logic as at edge
+            print(f"prob_low: {prob_low}, prob_high: {prob_high}")
             if self.step_count < cfg.min_steps_before_go:
                 return ACT_STOP
             if prob_low > 0.85 and prob_high < 0.10:
@@ -525,9 +545,9 @@ class UnseenCarPOMDPAgent:
         
         # Base danger from visibility
         danger_score = 0.0
-        if visibility_ratio < 0.4:
+        if visibility_ratio > 1:
             danger_score += 30
-        elif visibility_ratio < 0.6:
+        elif visibility_ratio > 0.85:
             danger_score += 15
         
         # Collision zone danger
@@ -543,9 +563,9 @@ class UnseenCarPOMDPAgent:
                 danger_score += unseen_danger
         
         # Determine observation
-        if danger_score > 60 or visibility_ratio < 0.3:
+        if danger_score > 60 or visibility_ratio > 1.2:
             return "high"
-        elif danger_score > 30 or visibility_ratio < 0.6:
+        elif danger_score > 30 or visibility_ratio > 1:
             return "medium"
         else:
             return "low"
@@ -593,7 +613,7 @@ class UnseenCarPOMDPAgent:
             pos_str = position.name
             belief_str = self.belief.summary()
             print(f"[POMDP t={time_sec:.2f}s] {belief_str} → {action.name.upper()} "
-                  f"({pos_str}, FOV={fov_info['visibility_ratio']:.0%}, "
+                  f"({pos_str}, FOV={1-fov_info['visibility_ratio']:.0%}, "
                   f"blocked={self.policy.steps_blocked})")
         
         return action.name, info

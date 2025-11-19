@@ -40,36 +40,36 @@ def should_av_go_col_zone(cross_traffic, av, blocker):
     # visible_range_lower = visible_x_range_at_y(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2)[1]
     # visible_range_upper = visible_x_range_at_y(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2)[0]
     # print(f"{visible_range_lower}, {visible_range_upper}")
-    visible_range_lower = poly_find_x(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2, side='right')
-    visible_range_upper = poly_find_x(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2, side='left')
+    # visible_range_lower, fov_polygon = poly_find_x(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2, side='right')
+    # visible_range_upper, fov_polygon = poly_find_x(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2, side='left')
     # print(f"{visible_range_lower}, {visible_range_upper}")
 
         # Check cars at limits of visible x range
-    # 
-    if visible_range_lower < 0.75*config.WIDTH:            
-        car_t1 = travel_time(abs(visible_range_lower-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
-        car_t2 = travel_time(abs((visible_range_lower+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+    # # 
+    # if visible_range_lower < 0.75*config.WIDTH:            
+    #     car_t1 = travel_time(abs(visible_range_lower-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+    #     car_t2 = travel_time(abs((visible_range_lower+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
 
-        if av.col_zone_times[0,0] < car_t2 and car_t1 < av.col_zone_times[0,1]:
-            if av.inch_behave and not av.inching:
-                print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
-                av.inching = True
-            return False
+    #     if av.col_zone_times[0,0] < car_t2 and car_t1 < av.col_zone_times[0,1]:
+    #         if av.inch_behave and not av.inching:
+    #             print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
+    #             av.inching = True
+    #         return False
     
-    if visible_range_upper > 0.25*config.WIDTH:
-        car_t1 = travel_time(abs((visible_range_upper)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
-        car_t2 = travel_time(abs((visible_range_upper-config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+    # if visible_range_upper > 0.25*config.WIDTH:
+    #     car_t1 = travel_time(abs((visible_range_upper)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
+    #     car_t2 = travel_time(abs((visible_range_upper-config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(cross_traffic[0].acceleration), config.CROSS_SPEED)
 
-        if av.col_zone_times[1,0] < car_t2 and car_t1 < av.col_zone_times[1,1]:
-            if av.inch_behave and not av.inching:
-                print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
-                av.inching = True
-            return False
+    #     if av.col_zone_times[1,0] < car_t2 and car_t1 < av.col_zone_times[1,1]:
+    #         if av.inch_behave and not av.inching:
+    #             print("[DECISION] FOV is too reduced to move! Starting to inch forward.")
+    #             av.inching = True
+    #         return False
     
-    if av.inching:
-        print("[DECISION] FOV is sufficient, stopping inching behaviour.")
-        av.inching = False
-        return False
+    # if av.inching:
+    #     print("[DECISION] FOV is sufficient, stopping inching behaviour.")
+    #     av.inching = False
+    #     return False
 
 
     for car in cross_traffic:
@@ -167,167 +167,6 @@ def should_av_go(cross_traffic, av, blocker):
             return False
        
     return True
-
-def should_av_go_probabilistic(cross_traffic, av, blocker, threshold=0.9, num_samples=100):
-    """
-    Probabilistic decision on whether the AV should cross the intersection.
-    Uses a Monte Carlo / HMM-style uncertainty model for cross-traffic predictions.
-    
-    Args:
-        cross_traffic: list of cars
-        av: autonomous vehicle object
-        blocker: blocking object for FOV
-        threshold: probability threshold for safe crossing
-        num_samples: number of Monte Carlo samples
-    """
-
-    req_dist_upper = 2*config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    req_time_upper = time_to_cover_distance(req_dist_upper, av.acceleration, config.AV_SPEED)
-
-    req_dist_lower = config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    if av.intended_direction == 'right':
-        req_dist_lower += config.AV_HEIGHT // 2
-    req_time_lower = time_to_cover_distance(req_dist_lower, av.acceleration, config.AV_SPEED)
-
-    # Estimate required clearance in space
-    req_space_lower = req_time_lower * config.CROSS_SPEED
-    req_space_upper = req_time_upper * config.CROSS_SPEED
-
-    safe_count = 0
-
-    for _ in range(num_samples):
-        safe = True
-
-        for car in cross_traffic:
-            if not is_car_in_fov(car, av, blocker):
-                continue
-
-            if car.turn_stage > 1:
-                continue
-
-            # --- Probabilistic velocity / acceleration model ---
-            # Assume some uncertainty in observed velocity/acceleration
-            vx = random.gauss(car.vx, config.CROSS_SPEED/10)  # mean=car.vx, std=0.5 m/s
-            ax = random.gauss(car.acceleration, 0.05)  # mean=car.accel, std=0.2 m/s²
-
-            # Predict position after req_time
-            future_x_lower = car.x + vx*req_time_lower + 0.5*ax*req_time_lower**2
-            future_x_upper = car.x + vx*req_time_upper + 0.5*ax*req_time_upper**2
-
-            if car.direction == 'left':
-                x_diff = av.x - future_x_lower
-                if 0 <= x_diff < req_space_lower:
-                    safe = False
-            elif car.direction == 'right':
-                x_diff = future_x_upper - av.x
-                if av.intended_direction != 'left' and 0 <= x_diff < req_space_upper:
-                    safe = False
-
-            # If car occupies intersection center, treat as unsafe
-            if config.WIDTH//2 - config.CAR_WIDTH < car.x < config.WIDTH//2 + config.CAR_WIDTH:
-                safe = False
-
-            if not safe:
-                break
-
-        if safe:
-            safe_count += 1
-
-    # Compute probability of safe crossing
-    p_safe = safe_count / num_samples
-    return p_safe > threshold
-
-def gaussian_prob(x, mean, std):
-    """Probability density of x under Gaussian(mean, std)."""
-    return (1.0 / (std * np.sqrt(2*np.pi))) * np.exp(-0.5 * ((x - mean)/std)**2)
-
-def should_av_go_hmm(cross_traffic, av, blocker, threshold=0.9):
-    """
-    HMM-based version of AV crossing decision.
-    Explicitly models hidden states (braking, cruising, accelerating).
-    """
-
-    # --- Required clearance for AV ---
-    req_dist_upper = 2*config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    req_time_upper = time_to_cover_distance(req_dist_upper, av.acceleration, config.AV_SPEED)
-
-    req_dist_lower = config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    if av.intended_direction == 'right':
-        req_dist_lower += config.AV_HEIGHT // 2
-    req_time_lower = time_to_cover_distance(req_dist_lower, av.acceleration, config.AV_SPEED)
-
-    req_space_lower = req_time_lower * config.CROSS_SPEED
-    req_space_upper = req_time_upper * config.CROSS_SPEED
-
-    # --- HMM setup ---
-    hidden_states = ["braking", "cruising", "accelerating"]
-    transitions = {
-        "braking":      {"braking": 0.7, "cruising": 0.2, "accelerating": 0.1},
-        "cruising":     {"braking": 0.1, "cruising": 0.7, "accelerating": 0.2},
-        "accelerating": {"braking": 0.1, "cruising": 0.3, "accelerating": 0.6},
-    }
-    emissions = {
-        "braking":      {"mean": -2.0, "std": 1.0},
-        "cruising":     {"mean":  0.0, "std": 0.5},
-        "accelerating": {"mean":  1.5, "std": 1.0},
-    }
-
-    # --- Probability of safety across all cars ---
-    p_safe_total = 1.0
-
-    for car in cross_traffic:
-        if not is_car_in_fov(car, av, blocker):
-            continue
-        if car.turn_stage > 1:
-            continue
-
-        # --- Observation: acceleration ---
-        obs_acc = car.acceleration
-
-        # Compute posterior over hidden states given obs_acc
-        state_probs = {}
-        norm_factor = 0
-        for s in hidden_states:
-            likelihood = gaussian_prob(obs_acc, emissions[s]["mean"], emissions[s]["std"])
-            # Assume uniform prior over states for simplicity
-            state_probs[s] = likelihood
-            norm_factor += likelihood
-        for s in hidden_states:
-            state_probs[s] /= (norm_factor + 1e-9)  # normalize
-
-        # --- Predict collision probability ---
-        p_collision = 0.0
-        for s, prob_s in state_probs.items():
-            # Adjust predicted vx based on state
-            if s == "braking":
-                pred_vx = max(0, car.vx - 1.0)  # slow down
-            elif s == "accelerating":
-                pred_vx = car.vx + 1.0
-            else:
-                pred_vx = car.vx
-
-            # Future positions
-            future_x_lower = car.x + pred_vx*req_time_lower
-            future_x_upper = car.x + pred_vx*req_time_upper
-
-            # Collision check (similar to deterministic version)
-            if car.direction == 'left':
-                x_diff = av.x - future_x_lower
-                if 0 <= x_diff < req_space_lower:
-                    p_collision += prob_s
-            elif car.direction == 'right':
-                x_diff = future_x_upper - av.x
-                if av.intended_direction != 'left' and 0 <= x_diff < req_space_upper:
-                    p_collision += prob_s
-
-            if config.WIDTH//2 - config.CAR_WIDTH < car.x < config.WIDTH//2 + config.CAR_WIDTH:
-                p_collision += prob_s
-
-        # Probability that this car is safe = (1 - p_collision)
-        p_safe_total *= (1 - p_collision)
-
-    # Decision
-    return p_safe_total > threshold
 
 
 def should_av_go_with_unseen(cross_traffic, av, blocker, threshold=0.9, p_exist=0.3):
@@ -578,7 +417,7 @@ def poly_find_x(av, blockers, target_y, side='left'):
     """
     polygon = av.get_fov_polygon(blockers=blockers)
     if not polygon:
-        return None
+        return None, None
 
     # choose extreme x: left -> min x, right -> max x
     if side == 'left':
@@ -601,23 +440,23 @@ def poly_find_x(av, blockers, target_y, side='left'):
     x1, y1 = av.x, av.y
     x2, y2 = target_point
 
-    # helper: check if target_y lies between y1 and y2 inclusive
-    def y_between(y, a, b):
-        return min(a, b) <= y <= max(a, b)
-
     # handle horizontal segment
     if y2 == y1:
-        return x1 if target_y == y1 else None
+        return x1 if target_y == y1 else None, polygon
 
     # require the horizontal line at target_y to intersect the segment between (x1,y1) and (x2,y2)
     if not y_between(target_y, y1, y2):
-        return None
+        return None, polygon
 
     # if vertical segment (x1 == x2), intersection x is just that x
     if x2 == x1:
-        return x1
+        return x1, polygon
 
     # linear interpolation to find x at target_y
     t = (target_y - y1) / (y2 - y1)  # guaranteed not divide by zero because y2 != y1
     x_at_target = x1 + t * (x2 - x1)
-    return x_at_target
+    return x_at_target, polygon
+
+# helper: check if target_y lies between y1 and y2 inclusive
+def y_between(y, a, b):
+    return min(a, b) <= y <= max(a, b)
