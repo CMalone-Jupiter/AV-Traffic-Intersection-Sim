@@ -10,6 +10,7 @@ import pygame
 import utils
 from utils import (
     travel_time,
+    get_fov_info,
     is_car_in_fov,
     time_to_cover_distance,
     visible_x_range_at_y,
@@ -315,7 +316,15 @@ class AVPolicy(pomdp_py.RolloutPolicy):
         if value_go > 0 and value_go > value_creep + 20.0:
             return ACT_GO
         
-        return ACT_CREEP
+        if self.config.enable_creep_improvement:
+            hist = belief.get_histogram()
+            probs = {state.level: hist.get(state, 0.0) for state in hist.keys()}
+            if probs.get("high", 0.0) > probs.get("low", 0.0) and probs.get("high", 0.0) > probs.get("medium", 0.0):
+                return ACT_CREEP
+            else:
+                return ACT_STOP
+        else:
+            return ACT_STOP
 
 
 class PhantomCar:
@@ -568,22 +577,27 @@ class UnseenCarPOMDPAgent:
         if not isinstance(blockers, list):
             blockers = [blockers] if blockers is not None else []
 
-        fov_polygon = av.get_fov_polygon(blockers)
-        if len(fov_polygon) >= 3:
-            left_x = min(pt[0] for pt in fov_polygon[1:])
-            right_x = max(pt[0] for pt in fov_polygon[1:])
-            fov_width = right_x - left_x
-        else:
-            fov_width = 0
+        if len(blockers) == 0:
+            return "low"
+        
+        visibility_ratio = get_fov_info(av, blockers)
 
-        max_possible_fov = config.WIDTH * 0.7
-        visibility_ratio = fov_width / max_possible_fov if max_possible_fov > 0 else 0
+        # fov_polygon = av.get_fov_polygon(blockers)
+        # if len(fov_polygon) >= 3:
+        #     left_x = min(pt[0] for pt in fov_polygon[1:])
+        #     right_x = max(pt[0] for pt in fov_polygon[1:])
+        #     fov_width = right_x - left_x
+        # else:
+        #     fov_width = 0
+
+        # max_possible_fov = config.WIDTH * 0.7
+        # visibility_ratio = fov_width / max_possible_fov if max_possible_fov > 0 else 0
 
         danger_score = 0.0
 
-        if visibility_ratio < 0.4:
+        if visibility_ratio > 1:
             danger_score += 30
-        elif visibility_ratio < 0.6:
+        elif visibility_ratio > 0.85:
             danger_score += 15
 
         collision_danger, col_zone_safe = assess_collision_zone_danger(
@@ -605,12 +619,19 @@ class UnseenCarPOMDPAgent:
                 'info': unseen_info
             })
 
-        if danger_score > 60 or visibility_ratio < 0.3:
+        if danger_score > 60 or visibility_ratio > 1.2:
             obs = "high"
-        elif danger_score > 30 or visibility_ratio < 0.6:
+        elif danger_score > 30 or visibility_ratio > 1:
             obs = "medium"
         else:
             obs = "low"
+
+        # if danger_score > 60 or visibility_ratio > 1.2:
+        #     return "high"
+        # elif danger_score > 30 or visibility_ratio > 1:
+        #     return "medium"
+        # else:
+        #     return "low"
 
         if self.policy.step_count % 5 == 0:
             print(f"[OBS] danger={danger_score:.1f}, vis={visibility_ratio:.2f}, obs={obs}")
@@ -713,6 +734,12 @@ def should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent=None):
     if pomdp_agent is None:
         pomdp_agent = UnseenCarPOMDPAgent()
 
+    pomdp_agent.config.enable_creep_improvement = av.inch_behave
+    pomdp_agent.policy.config.enable_creep_improvement = av.inch_behave
+    pomdp_agent.reward_model.config.enable_creep_improvement = av.inch_behave
+    pomdp_agent.transition_model.config.enable_creep_improvement = av.inch_behave
+    pomdp_agent.observation_model.config.enable_creep_improvement = av.inch_behave
+
     if not isinstance(blockers, list):
         blockers = [blockers] if blockers is not None else []
 
@@ -740,23 +767,23 @@ def should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent=None):
             if pomdp_agent.policy.step_count % 5 == 0:
                 print(f"[OVERRIDE] GO blocked by safety check")
             av.inching = False
-            av.inch_behave = False
+            # av.inch_behave = False
             av.moving = False
             return False
 
         av.inching = False
-        av.inch_behave = False
+        # av.inch_behave = False
         av.moving = True
         print(f"[POMDP→SIM] ✓ GO (pos={av_pos:.1f})")
         return True
 
     elif action == "stop":
         av.inching = False
-        av.inch_behave = False
+        # av.inch_behave = False
         av.moving = False
 
-    elif action == "creep":
-        av.inch_behave = True
+    elif av.inch_behave == True and action == "creep":
+        # av.inch_behave = True
         av.inching = True
         av.moving = False
         if pomdp_agent.policy.step_count % 10 == 0:

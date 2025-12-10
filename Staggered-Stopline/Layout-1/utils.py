@@ -35,6 +35,28 @@ def travel_time(distance, v0, a, vmax):
 
     return t
 
+def get_fov_info(av, blockers):
+    """Get or compute FOV information with caching"""
+    # Compute FOV info
+    # fov_polygon = av.get_fov_polygon(blockers)
+    visible_range_lower, fov_polygon = poly_find_x(av, blockers, config.HEIGHT/2+config.LANE_WIDTH/2, side='right')
+    visible_range_upper, fov_polygon = poly_find_x(av, blockers, config.HEIGHT/2-config.LANE_WIDTH/2, side='left')
+    
+    if len(fov_polygon) < 3:
+        return 1
+    else:
+        # fov_points = fov_polygon[1:]
+        # left_x = min(pt[0] for pt in fov_points)
+        # right_x = max(pt[0] for pt in fov_points)
+        left_x = float(max(0, visible_range_upper))
+        right_x = float(min(config.WIDTH, visible_range_lower))
+        fov_width = right_x - left_x
+        
+        expected_fov_width = config.WIDTH * 0.5
+        visibility_ratio = max(left_x/(0.25*config.WIDTH), (config.WIDTH-right_x)/(config.WIDTH-0.75*config.WIDTH))
+    
+    return visibility_ratio
+
 def should_av_go_col_zone(cross_traffic, av, blocker):
 
     # visible_range_lower = visible_x_range_at_y(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2)[1]
