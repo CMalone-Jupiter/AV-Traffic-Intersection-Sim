@@ -39,6 +39,7 @@ pygame.display.set_caption("AV Intersection Simulator")
 
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
+font_small = pygame.font.SysFont(None, 22)
 # possible_directions = ['straight', 'left', 'right']
  
  
@@ -62,25 +63,30 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
     frames = []
     start_record = False
 
-    print(f'Saving Collisions: {save_fails}')
+    print(f'[INIT] Saving Collisions: {save_fails}')
     print("[INIT] Initializing POMDP Agent...")
     # Initialize POMDP agent
-    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=True, enable_visibility_check=True)
+    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=False, enable_visibility_check=False)
     pomdp_agent.verbose = False
     pomdp_agent.policy.verbose = False
     print(f"[INIT] POMDP Agent initialized")
-    print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
+    print(f"[INIT] p_exist = {pomdp_agent.config.p_exist}")
     
     av = av_class.AutonomousVehicle(screen)
     av.inch_behave = inch_behave
 
-    if include_stationary_vehicle:
-        stationary_vehicle = blocker_vehicle_class.StationaryVehicle(screen)
-    else:
-        stationary_vehicle = None
-
     intersection_obstruction = None
     parked_vehicle = None
+    stationary_vehicle = None
+
+    if include_stationary_vehicle:
+        if random.randint(0, 1):
+            intersection_obstruction = blocker_vehicle_class.IntersectionObstruction(screen)
+            print('[INIT] Blocking object is right intersection corner obstruction')
+        else:
+            stationary_vehicle = blocker_vehicle_class.StationaryVehicle(screen)
+            print('[INIT] Blocking object is vehicle in adjacent left lane')
+
     cross_traffic = []
     running = True
     deciding = False
@@ -165,8 +171,9 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
         # ============================================
  
         av.update()
+        collision, collision_car = av.check_collision(cross_traffic)
  
-        if av.check_collision(cross_traffic):
+        if collision:
             av.draw()
             for car in cross_traffic:
                 car.draw()
@@ -244,6 +251,24 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
             car.draw()
             if utils.is_car_in_fov(car, av,[stationary_vehicle, intersection_obstruction, parked_vehicle]):
                 pygame.draw.circle(screen, (255, 0, 0), car.rect.center, 5)  # small red dot
+
+        sample = font.render(f"Cross-Traffic Speed ", True, (0, 0, 0))
+        param_x = 30+config.WIDTH//2+int(2*config.LANE_WIDTH)+sample.get_width()
+
+        # instruction4 = font.render(f"Press 'S' to change:", True, (0, 0, 0))
+        # screen.blit(instruction4, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 85))
+        instruction4_ = font.render(f"Traffic Flow", True, (0, 0, 0))
+        screen.blit(instruction4_, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 75))
+        instruction4_ = font.render(f"[{config.TRAFFIC_FLOW} v/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 75))
+        instruction4_ = font.render(f"AV Speed", True, (0, 0, 0))
+        screen.blit(instruction4_, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 95))
+        instruction4_ = font.render(f"[{(config.AV_SPEED*8*config.FPS*3.6)/100:.0f} km/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 95))
+        instruction4_ = font.render(f"Cross-Traffic Speed", True, (0, 0, 0))
+        screen.blit(instruction4_, (10+config.WIDTH//2+int(2*config.LANE_WIDTH), 115))
+        instruction4_ = font.render(f"[{(config.CROSS_SPEED*8*config.FPS*3.6)/100:.0f} km/hr]", True, (0, 0, 0))
+        screen.blit(instruction4_, (param_x, 115))
 
         pygame.display.flip()
         if start_record:

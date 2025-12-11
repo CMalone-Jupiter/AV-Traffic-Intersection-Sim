@@ -57,9 +57,9 @@ def run_sim(include_stationary_vehicle=False):
     print("[INIT] Initializing POMDP Agent...")
     
     # Initialize POMDP agent
-    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=True, enable_visibility_check=False)
-    # pomdp_agent.verbose = False
-    # pomdp_agent.policy.verbose = False
+    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=False, enable_visibility_check=False)
+    pomdp_agent.verbose = False
+    pomdp_agent.policy.verbose = False
     print(f"[INIT] POMDP Agent initialized")
     print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
     # print(f"[CONFIG] unseen_car_danger_weight = {pomdp_agent.config.unseen_car_danger_weight}")
@@ -232,6 +232,8 @@ def run_sim(include_stationary_vehicle=False):
             
             # Use POMDP decision function
             should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
+            # print([state.level for state in pomdp_agent.belief])
+            # print([f'{state.level}: {value},' for state, value in pomdp_agent.belief.get_histogram().items()])
             
             # The POMDP function handles av.moving and av.inching internally
             if not deciding and not should_go:
@@ -239,8 +241,9 @@ def run_sim(include_stationary_vehicle=False):
         # ============================================
  
         av.update()
+        collision, collision_car = av.check_collision(cross_traffic)
  
-        if av.check_collision(cross_traffic):
+        if collision:
             av.draw()
             for car in cross_traffic:
                 car.draw()

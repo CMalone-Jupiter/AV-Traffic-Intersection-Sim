@@ -46,7 +46,7 @@ class UnseenCarPOMDPConfig:
     # FOV thresholds
     fov_blocked_threshold: float = 0.9
 
-    enable_unseen_car_model: bool = True
+    enable_unseen_car_model: bool = False
     enable_visibility_check: bool = False
 
     # Prior probability that an unseen car exists at FOV edge
@@ -463,118 +463,118 @@ def assess_collision_zone_danger(cross_traffic, av, blockers,
     return danger, safe_to_go
 
 
-def model_unseen_cars_in_blocked_areas(av, blockers,
-                                       pomdp_config: UnseenCarPOMDPConfig = POMDP_CONFIG) -> Tuple[float, Dict]:
-    """Model unseen cars in blocked areas"""
-    if not pomdp_config.enable_unseen_car_model:
-        # print('Unseen car not enabled')
-        return 0.0, {"enabled": False}
+# def model_unseen_cars_in_blocked_areas(av, blockers,
+#                                        pomdp_config: UnseenCarPOMDPConfig = POMDP_CONFIG) -> Tuple[float, Dict]:
+#     """Model unseen cars in blocked areas"""
+#     if not pomdp_config.enable_unseen_car_model:
+#         # print('Unseen car not enabled')
+#         return 0.0, {"enabled": False}
 
-    blocked_info = analyze_blocked_areas(av, blockers, pomdp_config)
+#     blocked_info = analyze_blocked_areas(av, blockers, pomdp_config)
 
-    if not blocked_info["valid"]:
-        # print('invalid block')
-        return 0.0, {"valid": False, **blocked_info}
+#     if not blocked_info["valid"]:
+#         # print('invalid block')
+#         return 0.0, {"valid": False, **blocked_info}
 
-    if blocked_info["fov_ratio"] <= pomdp_config.fov_blocked_threshold:
-        # print('Blocked FOV ratio not bad enough')
-        return 0.0, {"fov_sufficient": True, "fov_ratio": blocked_info["fov_ratio"], **blocked_info}
+#     if blocked_info["fov_ratio"] <= pomdp_config.fov_blocked_threshold:
+#         # print('Blocked FOV ratio not bad enough')
+#         return 0.0, {"fov_sufficient": True, "fov_ratio": blocked_info["fov_ratio"], **blocked_info}
 
-    # if blocked_info["total_hidden_width"] < pomdp_config.min_hidden_width_for_concern:
-    #     # print('Total hidden width not large enough')
-    #     return 0.0, {"hidden_width_too_small": True, "total_hidden": blocked_info["total_hidden_width"], **blocked_info}
-    print('FOV block detected!')
-    danger_contribution = 0.0
-    unseen_cars_info = []
+#     # if blocked_info["total_hidden_width"] < pomdp_config.min_hidden_width_for_concern:
+#     #     # print('Total hidden width not large enough')
+#     #     return 0.0, {"hidden_width_too_small": True, "total_hidden": blocked_info["total_hidden_width"], **blocked_info}
+#     print('FOV block detected!')
+#     danger_contribution = 0.0
+#     unseen_cars_info = []
 
-    req_dist_upper = 2 * config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    req_time_upper = time_to_cover_distance(req_dist_upper, av.acceleration, config.AV_SPEED)
+#     req_dist_upper = 2 * config.LANE_WIDTH + 40 + config.AV_HEIGHT
+#     req_time_upper = time_to_cover_distance(req_dist_upper, av.acceleration, config.AV_SPEED)
 
-    req_dist_lower = 2 * config.LANE_WIDTH + 40 + config.AV_HEIGHT
-    if av.intended_direction == 'right':
-        req_dist_lower += config.AV_HEIGHT // 2
-    req_time_lower = time_to_cover_distance(req_dist_lower, av.acceleration, config.AV_SPEED)
+#     req_dist_lower = 2 * config.LANE_WIDTH + 40 + config.AV_HEIGHT
+#     if av.intended_direction == 'right':
+#         req_dist_lower += config.AV_HEIGHT // 2
+#     req_time_lower = time_to_cover_distance(req_dist_lower, av.acceleration, config.AV_SPEED)
 
-    req_space_lower = req_time_lower * config.CROSS_SPEED
-    req_space_upper = req_time_upper * config.CROSS_SPEED
+#     req_space_lower = req_time_lower * config.CROSS_SPEED
+#     req_space_upper = req_time_upper * config.CROSS_SPEED
 
-    # Left edge
-    if blocked_info["left_blocked"]:
-        p_exist_left = pomdp_config.p_exist
+#     # Left edge
+#     if blocked_info["left_blocked"]:
+#         p_exist_left = pomdp_config.p_exist
 
-        if pomdp_config.use_distance_weighting:
-            norm_distance = blocked_info["left_distance_to_intersection"] / (config.WIDTH / 2)
-            distance_multiplier = 2.0 - norm_distance
-            p_exist_left *= distance_multiplier * pomdp_config.distance_weight_factor
+#         if pomdp_config.use_distance_weighting:
+#             norm_distance = blocked_info["left_distance_to_intersection"] / (config.WIDTH / 2)
+#             distance_multiplier = 2.0 - norm_distance
+#             p_exist_left *= distance_multiplier * pomdp_config.distance_weight_factor
 
-        if pomdp_config.consider_collision_timing:
-            distance_to_intersection = abs(blocked_info["left_edge_x"] - config.WIDTH // 2)
-            collision_time = travel_time(distance_to_intersection, config.CROSS_SPEED, 0, config.CROSS_SPEED)
+#         if pomdp_config.consider_collision_timing:
+#             distance_to_intersection = abs(blocked_info["left_edge_x"] - config.WIDTH // 2)
+#             collision_time = travel_time(distance_to_intersection, config.CROSS_SPEED, 0, config.CROSS_SPEED)
 
-            hypothetical_x = blocked_info["left_edge_x"]
-            future_x_lower = hypothetical_x + config.CROSS_SPEED * req_time_lower
-            x_diff = av.x - future_x_lower
+#             hypothetical_x = blocked_info["left_edge_x"]
+#             future_x_lower = hypothetical_x + config.CROSS_SPEED * req_time_lower
+#             x_diff = av.x - future_x_lower
 
-            if collision_time < pomdp_config.critical_collision_time and 0 <= x_diff < req_space_lower:
-                p_exist_left *= 1.5
-                p_exist_left = min(p_exist_left, 0.9)
+#             if collision_time < pomdp_config.critical_collision_time and 0 <= x_diff < req_space_lower:
+#                 p_exist_left *= 1.5
+#                 p_exist_left = min(p_exist_left, 0.9)
 
-        left_danger = p_exist_left * pomdp_config.unseen_car_danger_weight
-        danger_contribution += left_danger
-        print(f'Left Danger: {left_danger}')
+#         left_danger = p_exist_left * pomdp_config.unseen_car_danger_weight
+#         danger_contribution += left_danger
+#         print(f'Left Danger: {left_danger}')
 
-        unseen_cars_info.append({
-            "edge": "left",
-            "position_x": blocked_info["left_edge_x"],
-            "hidden_width": blocked_info["left_hidden_width"],
-            "p_exist": p_exist_left,
-            "danger": left_danger,
-            "distance_to_intersection": blocked_info["left_distance_to_intersection"]
-        })
+#         unseen_cars_info.append({
+#             "edge": "left",
+#             "position_x": blocked_info["left_edge_x"],
+#             "hidden_width": blocked_info["left_hidden_width"],
+#             "p_exist": p_exist_left,
+#             "danger": left_danger,
+#             "distance_to_intersection": blocked_info["left_distance_to_intersection"]
+#         })
 
-    # Right edge
-    if blocked_info["right_blocked"] and pomdp_config.model_multiple_edges:
-        p_exist_right = pomdp_config.p_exist
+#     # Right edge
+#     if blocked_info["right_blocked"] and pomdp_config.model_multiple_edges:
+#         p_exist_right = pomdp_config.p_exist
 
-        if pomdp_config.use_distance_weighting:
-            norm_distance = blocked_info["right_distance_to_intersection"] / (config.WIDTH / 2)
-            distance_multiplier = 2.0 - norm_distance
-            p_exist_right *= distance_multiplier * pomdp_config.distance_weight_factor
+#         if pomdp_config.use_distance_weighting:
+#             norm_distance = blocked_info["right_distance_to_intersection"] / (config.WIDTH / 2)
+#             distance_multiplier = 2.0 - norm_distance
+#             p_exist_right *= distance_multiplier * pomdp_config.distance_weight_factor
 
-        if pomdp_config.consider_collision_timing:
-            distance_to_intersection = abs(blocked_info["right_edge_x"] - config.WIDTH // 2)
-            collision_time = travel_time(distance_to_intersection, config.CROSS_SPEED, 0, config.CROSS_SPEED)
+#         if pomdp_config.consider_collision_timing:
+#             distance_to_intersection = abs(blocked_info["right_edge_x"] - config.WIDTH // 2)
+#             collision_time = travel_time(distance_to_intersection, config.CROSS_SPEED, 0, config.CROSS_SPEED)
 
-            hypothetical_x = blocked_info["right_edge_x"]
-            future_x_upper = hypothetical_x + config.CROSS_SPEED * req_time_upper
-            x_diff = future_x_upper - av.x
+#             hypothetical_x = blocked_info["right_edge_x"]
+#             future_x_upper = hypothetical_x + config.CROSS_SPEED * req_time_upper
+#             x_diff = future_x_upper - av.x
 
-            if (collision_time < pomdp_config.critical_collision_time
-                    and av.intended_direction != 'left' and 0 <= x_diff < req_space_upper):
-                p_exist_right *= 1.5
-                p_exist_right = min(p_exist_right, 0.9)
+#             if (collision_time < pomdp_config.critical_collision_time
+#                     and av.intended_direction != 'left' and 0 <= x_diff < req_space_upper):
+#                 p_exist_right *= 1.5
+#                 p_exist_right = min(p_exist_right, 0.9)
 
-        right_danger = p_exist_right * pomdp_config.unseen_car_danger_weight
-        danger_contribution += right_danger
-        print(f'Right Danger: {right_danger}')
+#         right_danger = p_exist_right * pomdp_config.unseen_car_danger_weight
+#         danger_contribution += right_danger
+#         print(f'Right Danger: {right_danger}')
 
-        unseen_cars_info.append({
-            "edge": "right",
-            "position_x": blocked_info["right_edge_x"],
-            "hidden_width": blocked_info["right_hidden_width"],
-            "p_exist": p_exist_right,
-            "danger": right_danger,
-            "distance_to_intersection": blocked_info["right_distance_to_intersection"]
-        })
+#         unseen_cars_info.append({
+#             "edge": "right",
+#             "position_x": blocked_info["right_edge_x"],
+#             "hidden_width": blocked_info["right_hidden_width"],
+#             "p_exist": p_exist_right,
+#             "danger": right_danger,
+#             "distance_to_intersection": blocked_info["right_distance_to_intersection"]
+#         })
 
-    detailed_info = {
-        "enabled": True,
-        "danger_contribution": danger_contribution,
-        "unseen_cars": unseen_cars_info,
-        "num_edges_blocked": len(unseen_cars_info),
-        **blocked_info
-    }
-    return danger_contribution, detailed_info
+#     detailed_info = {
+#         "enabled": True,
+#         "danger_contribution": danger_contribution,
+#         "unseen_cars": unseen_cars_info,
+#         "num_edges_blocked": len(unseen_cars_info),
+#         **blocked_info
+#     }
+#     return danger_contribution, detailed_info
 
 
 class UnseenCarPOMDPAgent:
@@ -599,6 +599,10 @@ class UnseenCarPOMDPAgent:
 
         self.last_action = ACT_STOP
         self.unseen_car_history = []
+        self.visibility_ratio = 0
+        self.safe_to_go = True
+        self.danger_score = 0
+        self.obs = "low"
 
     def observe_traffic_state(self, cross_traffic, av, blockers) -> str:
         """Generate observation"""
@@ -609,7 +613,7 @@ class UnseenCarPOMDPAgent:
         #     return "low"
         
         visibility_ratio, left_x, right_x, fov_width = get_fov_info(av, blockers)
-
+        self.visibility_ratio = visibility_ratio
         # fov_polygon = av.get_fov_polygon(blockers)
         # if len(fov_polygon) >= 3:
         #     left_x = min(pt[0] for pt in fov_polygon[1:])
@@ -624,7 +628,9 @@ class UnseenCarPOMDPAgent:
         danger_score = 0.0
 
         if self.config.enable_visibility_check:
-            if visibility_ratio > 1:
+            if visibility_ratio > 1.15:
+                danger_score += 60
+            elif visibility_ratio > 1:
                 danger_score += 30
             elif visibility_ratio > 0.85:
                 danger_score += 15
@@ -633,6 +639,7 @@ class UnseenCarPOMDPAgent:
             cross_traffic, av, blockers, self.config
         )
         danger_score += collision_danger
+        self.safe_to_go = col_zone_safe
 
         # if self.config.enable_unseen_car_model:
         #     unseen_danger, unseen_info = model_unseen_cars_in_blocked_areas(
@@ -649,12 +656,16 @@ class UnseenCarPOMDPAgent:
         #             'info': unseen_info
         #         })
 
-        if danger_score > 60 or (visibility_ratio > 1.2 and self.config.enable_visibility_check):
+        self.danger_score = danger_score
+
+        if danger_score >= 60: #or (visibility_ratio > 1.2 and self.config.enable_visibility_check):
             obs = "high"
-        elif danger_score > 30 or (visibility_ratio > 1 and self.config.enable_visibility_check):
+        elif danger_score >= 30: #or (visibility_ratio > 1 and self.config.enable_visibility_check):
             obs = "medium"
         else:
             obs = "low"
+
+        self.obs = obs
 
         if self.policy.step_count % 5 == 0 and self.verbose:
             print(f"[OBS] danger={danger_score:.1f}, vis={visibility_ratio:.2f}, obs={obs}")

@@ -95,7 +95,9 @@ def should_av_go_col_zone(cross_traffic, av, blocker):
 
 
     for car in cross_traffic:
+        car.speed_check = (car.vx, car.vy)
         if not is_car_in_fov(car, av, blocker):
+            car.visible = False
             continue  # Ignore cars outside FOV
         if car.is_in_intersection() and car.turn_stage < 2:
             return False
