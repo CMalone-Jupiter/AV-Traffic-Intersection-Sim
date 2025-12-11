@@ -65,7 +65,9 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
     print(f'Saving Collisions: {save_fails}')
     print("[INIT] Initializing POMDP Agent...")
     # Initialize POMDP agent
-    pomdp_agent = UnseenCarPOMDPAgent()
+    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=True, enable_visibility_check=True)
+    pomdp_agent.verbose = False
+    pomdp_agent.policy.verbose = False
     print(f"[INIT] POMDP Agent initialized")
     print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
     
@@ -82,7 +84,7 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
     cross_traffic = []
     running = True
     deciding = False
-    set_decision_timer(5000, 15000)
+    set_decision_timer(2000, 7000)
 
     if epoch >= epochs:
         running = False
@@ -93,7 +95,7 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
         sys.exit()
     else:
         print(f"[STATUS] Running experiment {epoch+1}")
- 
+    print(f"[STATUS] Waiting for timer")
     while running:
         utils.draw_roads(screen)
 
@@ -150,7 +152,11 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
             # Use POMDP decision function
             should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
 
-            if should_go or av.inching:
+            if should_go:
+                print(f"[STATUS] Attempting to navigate intersection")
+                start_record = True
+                
+            if av.inching:
                 start_record = True
             
             # The POMDP function handles av.moving and av.inching internally

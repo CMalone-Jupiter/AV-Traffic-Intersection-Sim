@@ -55,7 +55,7 @@ def get_fov_info(av, blockers):
         expected_fov_width = config.WIDTH * 0.5
         visibility_ratio = max(left_x/(0.25*config.WIDTH), (config.WIDTH-right_x)/(config.WIDTH-0.75*config.WIDTH))
     
-    return visibility_ratio
+    return visibility_ratio, left_x, right_x, fov_width
 
 def should_av_go_col_zone(cross_traffic, av, blocker):
 

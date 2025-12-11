@@ -44,15 +44,16 @@ class UnseenCarPOMDPConfig:
     max_info_gathering_steps: int = 40
 
     # FOV thresholds
-    fov_blocked_threshold: float = 0.5
+    fov_blocked_threshold: float = 0.9
 
     enable_unseen_car_model: bool = True
+    enable_visibility_check: bool = False
 
     # Prior probability that an unseen car exists at FOV edge
-    p_exist: float = 0.3
+    p_exist: float = 1.0
 
     # Danger weight per expected unseen car
-    unseen_car_danger_weight: float = 35.0
+    unseen_car_danger_weight: float = 60.0
 
     # Spatial parameters
     edge_detection_threshold: float = 50.0
@@ -251,6 +252,7 @@ class AVPolicy(pomdp_py.RolloutPolicy):
         self.transition_model = transition_model
         self.reward_model = reward_model
         self.step_count = 0
+        self.verbose = True
 
     def get_all_actions(self, state=None, history=None):
         return ALL_ACTIONS
@@ -295,7 +297,7 @@ class AVPolicy(pomdp_py.RolloutPolicy):
         value_go = self.compute_expected_reward(belief, ACT_GO)
 
         # Print values every 5 steps
-        if self.step_count % 5 == 0:
+        if self.step_count % 5 == 0 and self.verbose:
             print(f"[VALUE] stop={value_stop:.1f}, creep={value_creep:.1f}, go={value_go:.1f}")
 
         # AT EDGE → choose between STOP and GO
@@ -354,19 +356,20 @@ def analyze_blocked_areas(av, blockers, pomdp_config: UnseenCarPOMDPConfig = POM
     if len(fov_polygon) < 3:
         return {"valid": False, "reason": "no_fov_polygon"}
 
-    fov_points = fov_polygon[1:]
-    left_x = min(pt[0] for pt in fov_points)
-    right_x = max(pt[0] for pt in fov_points)
-    fov_width = right_x - left_x
+    # fov_points = fov_polygon[1:]
+    # left_x = min(pt[0] for pt in fov_points)
+    # right_x = max(pt[0] for pt in fov_points)
+    # fov_width = right_x - left_x
+    visibility_ratio, left_x, right_x, fov_width = get_fov_info(av, blockers)
 
-    expected_fov_width = config.WIDTH * 0.7
+    # expected_fov_width = config.WIDTH * 0.7
     expected_left = config.WIDTH * 0.15
     expected_right = config.WIDTH * 0.85
 
-    left_blocked = left_x > (expected_left + pomdp_config.edge_detection_threshold)
+    left_blocked = left_x > expected_left #+ pomdp_config.edge_detection_threshold)
     left_hidden_width = left_x - expected_left if left_blocked else 0
 
-    right_blocked = right_x < (expected_right - pomdp_config.edge_detection_threshold)
+    right_blocked = right_x < expected_right #- pomdp_config.edge_detection_threshold)
     right_hidden_width = expected_right - right_x if right_blocked else 0
 
     intersection_center_x = config.WIDTH // 2
@@ -378,7 +381,7 @@ def analyze_blocked_areas(av, blockers, pomdp_config: UnseenCarPOMDPConfig = POM
     return {
         "valid": True,
         "fov_width": fov_width,
-        "fov_ratio": fov_width / expected_fov_width,
+        "fov_ratio": visibility_ratio,
         "left_edge_x": left_x,
         "left_blocked": left_blocked,
         "left_hidden_width": left_hidden_width,
@@ -406,6 +409,7 @@ def create_phantom_cars_from_blocked_info(blocked_info: Dict) -> List[PhantomCar
 
     if blocked_info.get("right_blocked", False):
         x = blocked_info["right_edge_x"]
+        # print(f'Phantom vehicle right: x={x}, y={left_moving_y}')
         phantoms.append(PhantomCar(direction="left", x=x, y=left_moving_y))
 
     return phantoms
@@ -419,16 +423,30 @@ def assess_collision_zone_danger(cross_traffic, av, blockers,
 
     blocked_info = analyze_blocked_areas(av, blockers, pomdp_config)
 
-    phantom_cars = []
-    if blocked_info.get("valid", False) and blocked_info.get("any_blocked", False):
-        phantom_cars = create_phantom_cars_from_blocked_info(blocked_info)
+    if pomdp_config.enable_unseen_car_model:
+        phantom_cars = []
+        if blocked_info.get("valid", False) and blocked_info.get("any_blocked", False):
+            # print('Adding phantom cars')
+            phantom_cars = create_phantom_cars_from_blocked_info(blocked_info)
+            # print(phantom_cars)
 
-    cross_for_check = list(cross_traffic) + phantom_cars
+        cross_for_check = list(cross_traffic) + phantom_cars
+    else:
+        cross_for_check = cross_traffic
 
     if not cross_for_check:
+        # print(cross_traffic)
+        # print(list(cross_traffic))
+        # print(phantom_cars)
+        # print(cross_for_check)
         return 0.0, True
-
+    
+    # if len(phantom_cars) > 0:
+    #     safe_to_go = should_av_go_col_zone(phantom_cars, av, blockers)
+    #     # print(f'[Phantom] Safe to go? {safe_to_go}')
+    # else:
     safe_to_go = should_av_go_col_zone(cross_for_check, av, blockers)
+        # print(f'[Normal] Safe to go? {safe_to_go}')
 
     danger = 50.0 if not safe_to_go else 0.0
 
@@ -449,19 +467,23 @@ def model_unseen_cars_in_blocked_areas(av, blockers,
                                        pomdp_config: UnseenCarPOMDPConfig = POMDP_CONFIG) -> Tuple[float, Dict]:
     """Model unseen cars in blocked areas"""
     if not pomdp_config.enable_unseen_car_model:
+        # print('Unseen car not enabled')
         return 0.0, {"enabled": False}
 
     blocked_info = analyze_blocked_areas(av, blockers, pomdp_config)
 
     if not blocked_info["valid"]:
+        # print('invalid block')
         return 0.0, {"valid": False, **blocked_info}
 
-    if blocked_info["fov_ratio"] >= pomdp_config.fov_blocked_threshold:
+    if blocked_info["fov_ratio"] <= pomdp_config.fov_blocked_threshold:
+        # print('Blocked FOV ratio not bad enough')
         return 0.0, {"fov_sufficient": True, "fov_ratio": blocked_info["fov_ratio"], **blocked_info}
 
-    if blocked_info["total_hidden_width"] < pomdp_config.min_hidden_width_for_concern:
-        return 0.0, {"hidden_width_too_small": True, "total_hidden": blocked_info["total_hidden_width"], **blocked_info}
-
+    # if blocked_info["total_hidden_width"] < pomdp_config.min_hidden_width_for_concern:
+    #     # print('Total hidden width not large enough')
+    #     return 0.0, {"hidden_width_too_small": True, "total_hidden": blocked_info["total_hidden_width"], **blocked_info}
+    print('FOV block detected!')
     danger_contribution = 0.0
     unseen_cars_info = []
 
@@ -499,6 +521,7 @@ def model_unseen_cars_in_blocked_areas(av, blockers,
 
         left_danger = p_exist_left * pomdp_config.unseen_car_danger_weight
         danger_contribution += left_danger
+        print(f'Left Danger: {left_danger}')
 
         unseen_cars_info.append({
             "edge": "left",
@@ -533,6 +556,7 @@ def model_unseen_cars_in_blocked_areas(av, blockers,
 
         right_danger = p_exist_right * pomdp_config.unseen_car_danger_weight
         danger_contribution += right_danger
+        print(f'Right Danger: {right_danger}')
 
         unseen_cars_info.append({
             "edge": "right",
@@ -555,8 +579,11 @@ def model_unseen_cars_in_blocked_areas(av, blockers,
 
 class UnseenCarPOMDPAgent:
     """POMDP Agent with simple reward-based policy"""
-    def __init__(self, config: UnseenCarPOMDPConfig = POMDP_CONFIG):
+    def __init__(self, model_unseen_cars: bool = True, enable_visibility_check: bool = True, config: UnseenCarPOMDPConfig = POMDP_CONFIG):
         self.config = config
+        self.config.enable_unseen_car_model = model_unseen_cars
+        self.config.enable_visibility_check = enable_visibility_check
+        self.verbose = True
 
         self.transition_model = TransitionModel(config)
         self.observation_model = ObservationModel(config)
@@ -564,6 +591,7 @@ class UnseenCarPOMDPAgent:
         
         # Simple policy that uses rewards
         self.policy = AVPolicy(config, self.transition_model, self.reward_model)
+        self.policy.verbose = self.verbose
 
         # Initialize belief
         initial_belief = {OcclusionState(level): 1.0 / 3.0 for level in OcclusionState.LEVELS}
@@ -577,10 +605,10 @@ class UnseenCarPOMDPAgent:
         if not isinstance(blockers, list):
             blockers = [blockers] if blockers is not None else []
 
-        if len(blockers) == 0:
-            return "low"
+        # if len(blockers) == 0:
+        #     return "low"
         
-        visibility_ratio = get_fov_info(av, blockers)
+        visibility_ratio, left_x, right_x, fov_width = get_fov_info(av, blockers)
 
         # fov_polygon = av.get_fov_polygon(blockers)
         # if len(fov_polygon) >= 3:
@@ -595,45 +623,40 @@ class UnseenCarPOMDPAgent:
 
         danger_score = 0.0
 
-        if visibility_ratio > 1:
-            danger_score += 30
-        elif visibility_ratio > 0.85:
-            danger_score += 15
+        if self.config.enable_visibility_check:
+            if visibility_ratio > 1:
+                danger_score += 30
+            elif visibility_ratio > 0.85:
+                danger_score += 15
 
         collision_danger, col_zone_safe = assess_collision_zone_danger(
             cross_traffic, av, blockers, self.config
         )
         danger_score += collision_danger
 
-        unseen_danger, unseen_info = model_unseen_cars_in_blocked_areas(
-            av, blockers, self.config
-        )
-        danger_score += unseen_danger
+        # if self.config.enable_unseen_car_model:
+        #     unseen_danger, unseen_info = model_unseen_cars_in_blocked_areas(
+        #         av, blockers, self.config
+        #     )
+        #     danger_score += unseen_danger
 
-        if unseen_info.get('enabled') and unseen_danger > 0:
-            self.unseen_car_history.append({
-                'step': self.policy.step_count,
-                'danger': unseen_danger,
-                'collision_zone_safe': col_zone_safe,
-                'collision_danger': collision_danger,
-                'info': unseen_info
-            })
+        #     if unseen_info.get('enabled') and unseen_danger > 0:
+        #         self.unseen_car_history.append({
+        #             'step': self.policy.step_count,
+        #             'danger': unseen_danger,
+        #             'collision_zone_safe': col_zone_safe,
+        #             'collision_danger': collision_danger,
+        #             'info': unseen_info
+        #         })
 
-        if danger_score > 60 or visibility_ratio > 1.2:
+        if danger_score > 60 or (visibility_ratio > 1.2 and self.config.enable_visibility_check):
             obs = "high"
-        elif danger_score > 30 or visibility_ratio > 1:
+        elif danger_score > 30 or (visibility_ratio > 1 and self.config.enable_visibility_check):
             obs = "medium"
         else:
             obs = "low"
 
-        # if danger_score > 60 or visibility_ratio > 1.2:
-        #     return "high"
-        # elif danger_score > 30 or visibility_ratio > 1:
-        #     return "medium"
-        # else:
-        #     return "low"
-
-        if self.policy.step_count % 5 == 0:
+        if self.policy.step_count % 5 == 0 and self.verbose:
             print(f"[OBS] danger={danger_score:.1f}, vis={visibility_ratio:.2f}, obs={obs}")
 
         return obs
@@ -708,8 +731,9 @@ class UnseenCarPOMDPAgent:
 
         position_state = "IN_INTERSECTION" if in_intersection else ("AT_EDGE" if at_edge else "BEFORE_EDGE")
         time_sec = self.policy.step_count / config.FPS
-        print(f"[POMDP t={time_sec:.2f}s] {belief_summary} → {action.name.upper()} "
-              f"({position_state}, pos={av_top:.1f})")
+        if self.verbose:
+            print(f"[POMDP t={time_sec:.2f}s] {belief_summary} → {action.name.upper()} "
+                f"({position_state}, pos={av_top:.1f})")
 
         return action.name, info
 
@@ -750,21 +774,21 @@ def should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent=None):
 
     if action == "go":
         visible_danger = False
-        for car in cross_traffic:
-            if utils.is_car_in_fov(car, av, blockers):
-                if car.direction == 'left':
-                    x_diff = (car.x + config.CAR_WIDTH) - av.x
-                    if -50 < x_diff < 200:
-                        visible_danger = True
-                        break
-                else:
-                    x_diff = av.x - car.x
-                    if -50 < x_diff < 200:
-                        visible_danger = True
-                        break
+        # for car in cross_traffic:
+        #     if utils.is_car_in_fov(car, av, blockers):
+        #         if car.direction == 'left':
+        #             x_diff = (car.x + config.CAR_WIDTH) - av.x
+        #             if -50 < x_diff < 200:
+        #                 visible_danger = True
+        #                 break
+        #         else:
+        #             x_diff = av.x - car.x
+        #             if -50 < x_diff < 200:
+        #                 visible_danger = True
+        #                 break
 
         if visible_danger:
-            if pomdp_agent.policy.step_count % 5 == 0:
+            if pomdp_agent.policy.step_count % 5 == 0 and pomdp_agent.verbose:
                 print(f"[OVERRIDE] GO blocked by safety check")
             av.inching = False
             # av.inch_behave = False
@@ -774,7 +798,8 @@ def should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent=None):
         av.inching = False
         # av.inch_behave = False
         av.moving = True
-        print(f"[POMDP→SIM] ✓ GO (pos={av_pos:.1f})")
+        if pomdp_agent.verbose:
+            print(f"[POMDP→SIM] ✓ GO (pos={av_pos:.1f})")
         return True
 
     elif action == "stop":
@@ -786,7 +811,7 @@ def should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent=None):
         # av.inch_behave = True
         av.inching = True
         av.moving = False
-        if pomdp_agent.policy.step_count % 10 == 0:
+        if pomdp_agent.policy.step_count % 10 == 0 and pomdp_agent.verbose:
             print(f"[POMDP→SIM] ⚠ CREEP (pos={av_pos:.1f})")
         return False
 

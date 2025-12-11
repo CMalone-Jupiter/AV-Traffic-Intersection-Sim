@@ -10,7 +10,9 @@ import utils
 import ctypes
 
 # Import POMDP components
-from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_pomdp
+# from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_pomdp
+# from pomdp_world_state import should_av_go_pomdp, POMDPIntersectionController
+from pomdp_v2 import AVIntersectionPlanner
 
 on_off = ['OFF', 'ON']
 on_off_colour = [(255,0,0), (0,255,0)]
@@ -56,12 +58,42 @@ def reset_simulation():
 def run_sim(include_stationary_vehicle=False):
     print("[INIT] Initializing POMDP Agent...")
     
+    pomdp_config = {
+        # AV starting position and geometry
+        'av_start_x': config.WIDTH//2 - config.LANE_WIDTH - config.AV_WIDTH//2,  # = 350
+        'av_start_y': config.HEIGHT//2 + config.LANE_WIDTH + 40,  # = 390
+        
+        # Y-positions (AV moves upward = decreasing Y)
+        'stop_line_y': config.HEIGHT//2 + config.LANE_WIDTH + 40,  # = 390 (starting position)
+        'creep_limit_y': config.HEIGHT//2 + config.LANE_WIDTH + 1,  # = 350 (edge of intersection)
+        'conflict_zone_start_y': config.HEIGHT//2 + config.LANE_WIDTH,  # = 350
+        'conflict_zone_end_y': config.HEIGHT//2 - config.LANE_WIDTH,  # = 250
+        'intersection_exit_y': config.HEIGHT//2 - config.LANE_WIDTH,  # = 210 (cleared intersection)
+        
+        # X-position (intersection center)
+        'intersection_center_x': config.WIDTH//2,  # = 400
+        
+        # Velocities (using your config values)
+        'max_av_speed': config.AV_SPEED,  # = 3 (but negative when moving up: -3)
+        'cross_traffic_speed': config.CROSS_SPEED,  # = 3
+        'go_accel': 0.05,
+        'stop_accel': -0.1,
+        'creep_speed': -0.5,
+        'creep_accel': 0.05,
+        
+        # Other parameters
+        'obs_noise': 0.0,
+        'collision_penalty': -1000,
+        'goal_reward': 1000,
+        'time_penalty': -1,
+        'safe_time_gap': 2.5
+    }
     # Initialize POMDP agent
-    pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=True, enable_visibility_check=False)
-    # pomdp_agent.verbose = False
-    # pomdp_agent.policy.verbose = False
+    # pomdp_agent = UnseenCarPOMDPAgent()
+    # pomdp_agent = POMDPIntersectionController()
+    planner = AVIntersectionPlanner(pomdp_config, num_sims=30, max_depth=4, exploration_const=500, num_particles=50)
     print(f"[INIT] POMDP Agent initialized")
-    print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
+    # print(f"[CONFIG] p_exist = {pomdp_agent.config.p_exist}")
     # print(f"[CONFIG] unseen_car_danger_weight = {pomdp_agent.config.unseen_car_danger_weight}")
     # print(f"[CONFIG] confidence_threshold_go = {pomdp_agent.config.confidence_threshold_go}")
     
@@ -76,6 +108,7 @@ def run_sim(include_stationary_vehicle=False):
     cross_traffic = []
     running = True
     deciding = False
+    old_action = None
  
     while running:
         utils.draw_roads(screen)
@@ -193,11 +226,11 @@ def run_sim(include_stationary_vehicle=False):
 
                 focus_pygame()
 
-        pomdp_agent.transition_model.config.enable_creep_improvement = av.inch_behave
-        pomdp_agent.policy.config.enable_creep_improvement = av.inch_behave
-        pomdp_agent.observation_model.config.enable_creep_improvement = av.inch_behave
-        pomdp_agent.reward_model.config.enable_creep_improvement = av.inch_behave
-        pomdp_agent.config.enable_creep_improvement = av.inch_behave
+        # pomdp_agent.transition_model.config.enable_creep_improvement = av.inch_behave
+        # pomdp_agent.policy.config.enable_creep_improvement = av.inch_behave
+        # pomdp_agent.observation_model.config.enable_creep_improvement = av.inch_behave
+        # pomdp_agent.reward_model.config.enable_creep_improvement = av.inch_behave
+        # pomdp_agent.config.enable_creep_improvement = av.inch_behave
 
         # Spawn cross traffic
         if random.random() < (config.TRAFFIC_FLOW/3600)/config.FPS:
@@ -231,7 +264,22 @@ def run_sim(include_stationary_vehicle=False):
                 blockers.append(parked_vehicle)
             
             # Use POMDP decision function
-            should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
+            # should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
+            action = planner.get_action(av, cross_traffic, blockers)
+            if old_action == None or action != old_action:
+                print(f"Changing action: {action}")
+                old_action = action
+            
+            if action == 'go':
+                should_go = True
+                av.moving = True
+            else:
+                should_go = False
+                av.moving = False
+                if action == 'creep':
+                    av.inching = True
+                else:
+                    av.inching = False
             
             # The POMDP function handles av.moving and av.inching internally
             if not deciding and not should_go:
@@ -366,8 +414,11 @@ def run_sim(include_stationary_vehicle=False):
         screen.blit(instruction4_, (param_x, 145))
         
         # Display POMDP info
-        # belief_text = font_small.render(f"POMDP Belief: {pomdp_agent.policy.get_belief_summary(pomdp_agent.belief)}", True, (0, 0, 0))
-        # screen.blit(belief_text, (10, config.HEIGHT - 45))
+        try:
+            belief_text = font_small.render(f"POMDP Reward: {planner.problem.agent.reward_model.current_reward}", True, (0, 0, 0))
+            screen.blit(belief_text, (10, config.HEIGHT - 45))
+        except:
+            pass
         
         # step_text = font_small.render(f"POMDP Steps: {pomdp_agent.policy.step_count}", True, (0, 0, 0))
         # screen.blit(step_text, (10, config.HEIGHT - 25))
