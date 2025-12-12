@@ -8,6 +8,8 @@ import blocker_vehicle_class
 import cross_traffic_class
 import utils
 import ctypes
+import pandas as pd
+from pprint import pprint
 
 # Import POMDP components
 from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_pomdp
@@ -76,6 +78,21 @@ def run_sim(include_stationary_vehicle=False):
     cross_traffic = []
     running = True
     deciding = False
+    crash_diagnostic = {"Collisions": 0}
+    # crash_diagnostic = {
+    #     "AV-Direction": None,
+    #     "Blocking-Objects": [],
+    #     "Phantom-Vehicle-Check": False,
+    #     "Visibility-Check": False,
+    #     "Collision-Vehicle-Direction": None,
+    #     "Collision-Vehicle-Path": None,
+    #     "Collision-Vehicle-Vel": config.CROSS_SPEED,
+    #     "Collision-Vehicle-Turn-Stage": 0,
+    #     "Epoch": 0,
+    #     "POMDP-Hist": [],
+    #     "POMDP-Danger-Score": 0,
+    #     "POMDP-Visibility-Ratio": 0
+    # }
  
     while running:
         utils.draw_roads(screen)
@@ -223,12 +240,18 @@ def run_sim(include_stationary_vehicle=False):
         if av.manual_trigger and not av.moving and not av.collided:
             # Prepare blockers list
             blockers = []
+            blocker_names = []
             if stationary_vehicle is not None:
                 blockers.append(stationary_vehicle)
+                blocker_names.append("Vehicle in adjacent left lane.")
             if intersection_obstruction is not None:
                 blockers.append(intersection_obstruction)
+                blocker_names.append("Obstruction on near right corner.")
             if parked_vehicle is not None:
                 blockers.append(parked_vehicle)
+                blocker_names.append("Vehicle parked on the left lane-shoulder.")
+
+            av_trigger_info = [(av.x, av.y), (av.vx, av.vy), av.turn_stage, av.inch_behave]
             
             # Use POMDP decision function
             should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
@@ -244,6 +267,30 @@ def run_sim(include_stationary_vehicle=False):
         collision, collision_car = av.check_collision(cross_traffic)
  
         if collision:
+            crash_diagnostic = {
+                "AV-Path": av.intended_direction,
+                "AV-Position": av_trigger_info[0],
+                "AV-Velocity": av_trigger_info[1],
+                "AV-Turn-Stage": av_trigger_info[2],
+                "AV-Creep-Behaviour": av_trigger_info[3],
+                "Blocking-Objects": blocker_names,
+                "Phantom-Vehicle-Check": pomdp_agent.config.enable_unseen_car_model,
+                "Visibility-Check": pomdp_agent.config.enable_visibility_check,
+                "Collision-Vehicle-Direction": collision_car.direction,
+                "Collision-Vehicle-Path": collision_car.drive_path,
+                "Collision-Vehicle-Position": (collision_car.x, collision_car.y),
+                "Collision-Vehicle-Vel": collision_car.speed_check,
+                "Collision-Vehicle-Turn-Stage": collision_car.turn_stage,
+                "Collision-Vehicle-Visible-at-Decision": collision_car.visible,
+                "Epoch": 0,
+                "POMDP-Hist": [f'{state.level}: {value},' for state, value in pomdp_agent.belief.get_histogram().items()],
+                "POMDP-Danger-Score": pomdp_agent.danger_score,
+                "POMDP-Visibility-Ratio": pomdp_agent.visibility_ratio,
+                "POMDP-Safe-To-Go": pomdp_agent.safe_to_go,
+                "POMDP-Observation": pomdp_agent.obs
+            }
+            df = pd.DataFrame(list(crash_diagnostic.items()), columns=["key", "value"])
+            df.to_csv("./collision_diagnostics.csv", index=False)
             av.draw()
             for car in cross_traffic:
                 car.draw()
@@ -255,6 +302,7 @@ def run_sim(include_stationary_vehicle=False):
             #     print(f"  Unseen car model was active")
             #     print(f"  Activations: {summary['num_activations']}")
             #     print(f"  Total danger added: {summary['total_danger_added']:.1f}")
+            pprint(crash_diagnostic, indent=2)
             reset_simulation()
  
         # Check for success (AV fully exited top of screen)

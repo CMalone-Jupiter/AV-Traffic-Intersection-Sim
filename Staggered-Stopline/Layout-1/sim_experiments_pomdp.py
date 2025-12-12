@@ -11,6 +11,9 @@ import utils
 import numpy as np
 import os
 import cv2
+import pandas as pd
+import pickle
+from pprint import pprint
 
 # Import POMDP components
 from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_pomdp
@@ -41,6 +44,31 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 22)
 # possible_directions = ['straight', 'left', 'right']
+experiment_diagnostics = {
+    "AV-Path": [],
+    "AV-Position": [],
+    "AV-Velocity": [],
+    "AV-Turn-Stage": [],
+    "AV-Creep-Behaviour": [],
+    "Blocking-Objects": [],
+    "Phantom-Vehicle-Check": [],
+    "Visibility-Check": [],
+    "Collision-Vehicle-Direction": [],
+    "Collision-Vehicle-Path": [],
+    "Collision-Vehicle-Position": [],
+    "Collision-Vehicle-Vel": [],
+    "Collision-Vehicle-Turn-Stage": [],
+    "Collision-Vehicle-Visible-at-Decision": [],
+    "Epoch": [],
+    "POMDP-Hist": [],
+    "POMDP-Danger-Score": [],
+    "POMDP-Visibility-Ratio": [],
+    "POMDP-Safe-To-Go": [],
+    "POMDP-Observation": []
+}
+
+save_dir = './Epochs-1000-nochecks-blocker-avstraight-nocreep/'
+os.makedirs(save_dir, exist_ok=True)
  
  
 def reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle):
@@ -57,7 +85,6 @@ def set_decision_timer(min_ms, max_ms):
  
  
 def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behave=True, save_fails=False, include_stationary_vehicle=False):
-    save_dir = './results/'
     save_name = f"epoch-{epoch}_direction-{av_direction}_blocker-{include_stationary_vehicle}.csv"
     save_fails = save_fails
     frames = []
@@ -90,12 +117,15 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
     cross_traffic = []
     running = True
     deciding = False
+    crash_diagnostic = {"Collisions": 0}
     set_decision_timer(2000, 7000)
 
     if epoch >= epochs:
         running = False
         print(f"[STATUS] Finished running {epochs} experiments!")
         print(f"[RESULTS] AV had a {(np.array(success).sum()/epochs)*100}% success rate trying to cross the intersection")
+        with open(f"{save_dir}/Experiment-Collision-Diagnostics_direction-{av_direction}_blocker-{include_stationary_vehicle}.pkl", "wb") as f:
+            pickle.dump(experiment_diagnostics, f)
         np.savetxt(save_dir+save_name, np.array(success), delimiter=',')
         pygame.quit()
         sys.exit()
@@ -148,12 +178,18 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
         if av.manual_trigger and not av.moving and not av.collided:
             # Prepare blockers list
             blockers = []
+            blocker_names = []
             if stationary_vehicle is not None:
                 blockers.append(stationary_vehicle)
+                blocker_names.append("Vehicle in adjacent left lane.")
             if intersection_obstruction is not None:
                 blockers.append(intersection_obstruction)
+                blocker_names.append("Obstruction on near right corner.")
             if parked_vehicle is not None:
                 blockers.append(parked_vehicle)
+                blocker_names.append("Vehicle parked on the left lane-shoulder.")
+
+            av_trigger_info = [(av.x, av.y), (av.vx, av.vy), av.turn_stage, av.inch_behave]
             
             # Use POMDP decision function
             should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
@@ -174,11 +210,40 @@ def run_sim(epoch, epochs, running, success, av_direction='straight', inch_behav
         collision, collision_car = av.check_collision(cross_traffic)
  
         if collision:
+            crash_diagnostic = {
+                "AV-Path": av.intended_direction,
+                "AV-Position": av_trigger_info[0],
+                "AV-Velocity": av_trigger_info[1],
+                "AV-Turn-Stage": av_trigger_info[2],
+                "AV-Creep-Behaviour": av_trigger_info[3],
+                "Blocking-Objects": blocker_names,
+                "Phantom-Vehicle-Check": pomdp_agent.config.enable_unseen_car_model,
+                "Visibility-Check": pomdp_agent.config.enable_visibility_check,
+                "Collision-Vehicle-Direction": collision_car.direction,
+                "Collision-Vehicle-Path": collision_car.drive_path,
+                "Collision-Vehicle-Position": (collision_car.x, collision_car.y),
+                "Collision-Vehicle-Vel": collision_car.speed_check,
+                "Collision-Vehicle-Turn-Stage": collision_car.turn_stage,
+                "Collision-Vehicle-Visible-at-Decision": collision_car.visible,
+                "Epoch": 0,
+                "POMDP-Hist": [f'{state.level}: {value},' for state, value in pomdp_agent.belief.get_histogram().items()],
+                "POMDP-Danger-Score": pomdp_agent.danger_score,
+                "POMDP-Visibility-Ratio": pomdp_agent.visibility_ratio,
+                "POMDP-Safe-To-Go": pomdp_agent.safe_to_go,
+                "POMDP-Observation": pomdp_agent.obs
+            }
+            for key, value in crash_diagnostic.items():
+                experiment_diagnostics[key].append(value)
+            if save_fails:
+                df = pd.DataFrame(list(crash_diagnostic.items()), columns=["key", "value"])
+                df.to_csv("./collision_diagnostics.csv", index=False)
+
             av.draw()
             for car in cross_traffic:
                 car.draw()
             pygame.display.flip()
             print("\n[COLLISION DETECTED]")
+            pprint(crash_diagnostic, indent=2)
             
             success.append(0)
 
