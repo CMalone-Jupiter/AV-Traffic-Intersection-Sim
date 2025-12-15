@@ -16,6 +16,8 @@ class CrossTrafficCar:
         self.screen = screen
         self.turn_stage = 0
         self.e_stop = False
+        self.visible = True
+        self.speed_check = (config.CROSS_SPEED, 0)
         
         # Braking parameters
         self.brake_distance = 60         # Distance to start braking

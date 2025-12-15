@@ -453,5 +453,6 @@ class AutonomousVehicle:
             if self.rect.colliderect(car.rect):
                 self.collided = True
                 print("[COLLISION] Collision occurred! Resetting...")
-                return True
-        return False
+                # print(f"[INFO] Cross Traffic Vehicle Visibility at Decision: {car.visible}")
+                return True, car
+        return False, None
