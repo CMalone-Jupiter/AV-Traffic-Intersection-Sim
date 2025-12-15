@@ -1,6 +1,7 @@
 # Manually selected files
 *.csv
 *.mp4
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
