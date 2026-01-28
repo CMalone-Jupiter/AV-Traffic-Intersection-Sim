@@ -10,9 +10,13 @@ import blocker_vehicle_class
 import cross_traffic_class
 import utils
 import ctypes
+import os
 
 on_off = ['OFF', 'ON']
 on_off_colour = [(255,0,0), (0,255,0)]
+
+if config.HEADERLESS:
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
  
 pygame.init()
 screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
