@@ -26,6 +26,20 @@ print("[INIT] Starting POMDP-based intersection simulator")
 pygame.init()
 screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
 pygame.display.set_caption("AV Intersection Simulator with POMDP")
+
+if config.HEADERLESS:
+    # Override methods that do actual rendering
+    def noop(*args, **kwargs):
+        return None
+
+    pygame.Surface.blit = noop
+    pygame.Surface.fill = noop
+    pygame.draw.rect = noop
+    pygame.draw.circle = noop
+    pygame.draw.line = noop
+    pygame.display.flip = noop
+    pygame.display.update = noop
+
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 22)

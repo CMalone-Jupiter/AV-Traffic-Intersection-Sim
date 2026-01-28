@@ -40,6 +40,19 @@ pygame.display.set_caption("AV Intersection Simulator")
 # else:
 #     screen = pygame.Surface((config.WIDTH, config.HEIGHT))
 
+if config.HEADERLESS:
+    # Override methods that do actual rendering
+    def noop(*args, **kwargs):
+        return None
+
+    pygame.Surface.blit = noop
+    pygame.Surface.fill = noop
+    pygame.draw.rect = noop
+    pygame.draw.circle = noop
+    pygame.draw.line = noop
+    pygame.display.flip = noop
+    pygame.display.update = noop
+
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 22)
