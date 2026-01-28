@@ -18,34 +18,40 @@ from pomdp_v2 import AVIntersectionPlanner
 on_off = ['OFF', 'ON']
 on_off_colour = [(255,0,0), (0,255,0)]
 
+# ---------------- HEADLESS CONFIG ---------------- #
 if config.HEADERLESS:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
- 
+
 print("[INIT] Starting POMDP-based intersection simulator")
 
 pygame.init()
-screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-pygame.display.set_caption("AV Intersection Simulator with POMDP")
 
+# ---------------- SCREEN SETUP ---------------- #
 if config.HEADERLESS:
-    # Override methods that do actual rendering
-    def noop(*args, **kwargs):
-        return None
+    screen = pygame.Surface((config.WIDTH, config.HEIGHT))
 
-    pygame.Surface.blit = noop
-    pygame.Surface.fill = noop
-    pygame.draw.rect = noop
-    pygame.draw.circle = noop
-    pygame.draw.line = noop
-    pygame.display.flip = noop
-    pygame.display.update = noop
+    # Override display functions
+    pygame.display.flip = lambda: None
+    pygame.display.update = lambda *args, **kwargs: None
 
+    # Override common pygame.draw functions
+    pygame.draw.rect = lambda *args, **kwargs: None
+    pygame.draw.circle = lambda *args, **kwargs: None
+    pygame.draw.line = lambda *args, **kwargs: None
+
+else:
+    screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
+    pygame.display.set_caption("AV Intersection Simulator with POMDP")
+
+# ---------------- CLOCK & FONTS ---------------- #
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 22)
 
+# ---------------- WINDOWS API ---------------- #
 user32 = ctypes.WinDLL('user32')
 kernel32 = ctypes.WinDLL('kernel32')
+
 
 def focus_console():
     hWnd = kernel32.GetConsoleWindow()

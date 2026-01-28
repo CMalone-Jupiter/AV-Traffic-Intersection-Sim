@@ -24,21 +24,24 @@ if config.HEADERLESS:
 print("[INIT] Starting POMDP-based intersection simulator")
 
 pygame.init()
-screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-pygame.display.set_caption("AV Intersection Simulator with POMDP")
 
+# ---------------- SCREEN SETUP ---------------- #
 if config.HEADERLESS:
-    # Override methods that do actual rendering
-    def noop(*args, **kwargs):
-        return None
+    screen = pygame.Surface((config.WIDTH, config.HEIGHT))
 
-    pygame.Surface.blit = noop
-    pygame.Surface.fill = noop
-    pygame.draw.rect = noop
-    pygame.draw.circle = noop
-    pygame.draw.line = noop
-    pygame.display.flip = noop
-    pygame.display.update = noop
+    # Override display functions
+    pygame.display.flip = lambda: None
+    pygame.display.update = lambda *args, **kwargs: None
+
+    # Override common pygame.draw functions
+    pygame.draw.rect = lambda *args, **kwargs: None
+    pygame.draw.circle = lambda *args, **kwargs: None
+    pygame.draw.line = lambda *args, **kwargs: None
+
+else:
+    screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
+    pygame.display.set_caption("AV Intersection Simulator with POMDP")
+
 
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)

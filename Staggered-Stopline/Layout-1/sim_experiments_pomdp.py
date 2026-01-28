@@ -34,24 +34,25 @@ if config.HEADERLESS:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
  
 pygame.init()
-# if not HEADERLESS:
-screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-pygame.display.set_caption("AV Intersection Simulator")
+
+# ---------------- SCREEN SETUP ---------------- #
+if config.HEADERLESS:
+    screen = pygame.Surface((config.WIDTH, config.HEIGHT))
+
+    # Override display functions
+    pygame.display.flip = lambda: None
+    pygame.display.update = lambda *args, **kwargs: None
+
+    # Override common pygame.draw functions
+    pygame.draw.rect = lambda *args, **kwargs: None
+    pygame.draw.circle = lambda *args, **kwargs: None
+    pygame.draw.line = lambda *args, **kwargs: None
+
+else:
+    screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
+    pygame.display.set_caption("AV Intersection Simulator")
 # else:
 #     screen = pygame.Surface((config.WIDTH, config.HEIGHT))
-
-if config.HEADERLESS:
-    # Override methods that do actual rendering
-    def noop(*args, **kwargs):
-        return None
-
-    pygame.Surface.blit = noop
-    pygame.Surface.fill = noop
-    pygame.draw.rect = noop
-    pygame.draw.circle = noop
-    pygame.draw.line = noop
-    pygame.display.flip = noop
-    pygame.display.update = noop
 
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
