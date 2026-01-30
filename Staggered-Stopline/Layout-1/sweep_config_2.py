@@ -422,10 +422,39 @@ def run_baseline_sweep():
     print("="*70)
     
     configs = grid_sweep({
-        'p_exist': [0.2, 0.3, 0.4],
-        'unseen_car_danger_weight': [30, 35, 40],
-        'danger_high': [60, 70],
-        'danger_medium': [30, 35]
+    # Unseen car model (MOST IMPORTANT - affects danger calculation)
+    'p_exist': [0.2, 0.3, 0.4],                          
+    'unseen_car_danger_weight': [25, 30, 35, 40],        
+    'edge_detection_threshold': [40, 50, 60],            
+    
+    # Danger thresholds (CRITICAL - determines when it's "safe" to GO)
+    'danger_high': [50, 55, 60, 65, 70],                 
+    'danger_medium': [25, 30, 35],                       
+    
+    # Visibility thresholds
+    'visibility_high': [0.2, 0.3, 0.4],                  
+    'visibility_medium': [0.5, 0.6, 0.7],                
+    
+    # FOV penalties (affects observation model)
+    'fov_penalty_low': [25, 30, 35],                     
+    'fov_penalty_medium': [10, 15, 20],                  
+    'fov_threshold_low': [0.3, 0.4, 0.5],              
+    'fov_threshold_medium': [0.5, 0.6, 0.7],            
+    
+    # Transition model
+    'creep_improvement_rate': [0.3, 0.4, 0.5],          
+    'natural_change_rate': [0.05, 0.08, 0.12],          
+    
+    # Rewards (affects action selection)
+    'cost_stop': [-1, -5, -10],                         
+    'cost_creep': [-2, -2.5, -3],                        
+    'reward_go_low': [100, 150, 200],                    
+    'reward_go_medium': [-40, -20, 0],                   
+    'reward_go_high': [-350, -250, -150],               
+    
+    # Decision timing
+    'min_steps_before_go': [2, 4, 6],                    
+    'max_info_gathering_steps': [30, 40, 50, 60],        
     })
     
     print(f"This will test {len(configs)} configurations")
