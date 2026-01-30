@@ -1,10 +1,4 @@
-"""
-CORRECTED: Complete Parameter Sweep for Your POMDP Simulation
-
-Fixed Issues:
-1. av.update() takes no arguments (not cross_traffic, blockers, pomdp_agent)
-2. Added vy=0 to PhantomCar fix instructions
-"""
+#
 
 import pygame
 import random
@@ -31,46 +25,46 @@ from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, UnseenCarPOMDP
 class SweepConfig:
     """All tunable parameters from your POMDP"""
     
-    # Unseen car model (most important)
+
     p_exist: float = 0.3
     unseen_car_danger_weight: float = 35.0
     edge_detection_threshold: float = 50.0
     min_hidden_width_for_concern: float = 80.0
     
-    # Danger thresholds (from observe_traffic_state)
+
     danger_high: float = 60.0
     danger_medium: float = 30.0
     visibility_high: float = 0.3
     visibility_medium: float = 0.6
     
-    # FOV penalties
+
     fov_penalty_low: float = 30.0
     fov_penalty_medium: float = 15.0
     fov_threshold_low: float = 0.4
     fov_threshold_medium: float = 0.6
     max_possible_fov_ratio: float = 0.7
     
-    # Safety checks
+
     safety_x_min: float = -50.0
     safety_x_max: float = 200.0
     
-    # Transition model
+
     creep_improvement_rate: float = 0.4
     natural_change_rate: float = 0.08
     
-    # Rewards
+
     cost_stop: float = -1.0
     cost_creep: float = -2.5
     reward_go_low: float = 100.0
     reward_go_medium: float = -40.0
     reward_go_high: float = -350.0
     
-    # Sensor accuracy
+   
     sensor_accuracy_low: float = 0.92
     sensor_accuracy_medium: float = 0.75
     sensor_accuracy_high: float = 0.50
     
-    # Decision thresholds
+    
     min_steps_before_go: int = 4
     max_info_gathering_steps: int = 40
 
@@ -135,13 +129,13 @@ class HeadlessSimulator:
         Returns:
             dict with metrics: success, collision, time, steps, etc.
         """
-        # Initialize agent with this config
+      
         pomdp_agent = UnseenCarPOMDPAgent(config=pomdp_config)
         
-        # Initialize environment
+ 
         av = av_class.AutonomousVehicle(self.screen)
-        av.manual_trigger = True  # Auto-start
-        av.inch_behave = True  # Enable creeping behavior (CRITICAL!)
+        av.manual_trigger = True  
+        av.inch_behave = True  
         
         # Add blockers
         blockers = []
@@ -150,7 +144,7 @@ class HeadlessSimulator:
         
         cross_traffic = []
         
-        # Episode state
+ 
         collision = False
         success = False
         steps = 0
@@ -158,11 +152,11 @@ class HeadlessSimulator:
         stop_count = 0
         go_count = 0
         
-        # Run simulation loop
+       
         for steps in range(1, max_steps + 1):
          
             
-            # Spawn cross traffic (same logic as run_sim_pomdp.py)
+           
             if random.random() < config.TRAFFIC_FLOW / (3600 * config.FPS):
                 direction = random.choice(['left', 'right'])
                 new_car = cross_traffic_class.CrossTrafficCar(direction, 
@@ -170,18 +164,18 @@ class HeadlessSimulator:
                 )
                 cross_traffic.append(new_car)
             
-            # Update cross traffic (same as run_sim_pomdp.py line 235-237)
+            
             for car in cross_traffic:
-                car.update(cross_traffic)  # Pass cross_traffic for collision avoidance
+                car.update(cross_traffic)  
             cross_traffic = [c for c in cross_traffic 
                            if (-config.CAR_WIDTH < c.x < config.WIDTH + config.CAR_WIDTH)]
             
-            # POMDP decision (same as run_sim_pomdp.py line 240-257)
+            
             if av.manual_trigger and not av.moving and not av.collided:
-                # Use should_av_go_pomdp like the original code
+                
                 should_go = should_av_go_pomdp(cross_traffic, av, blockers, pomdp_agent)
                 
-                # Track actions based on av state
+                
                 if av.inching:
                     creep_count += 1
                 elif av.moving:
@@ -189,23 +183,23 @@ class HeadlessSimulator:
                 else:
                     stop_count += 1
             
-            # Update AV (FIXED: no arguments!)
+        
             av.update()
             
-            # Check for collision 
+           
             collision, collision_car = av.check_collision(cross_traffic)
             
             if collision:
                 break
             
-            # Check for success (same as run_sim_pomdp.py line 309-316)
+           
             if av.y + config.AV_HEIGHT < 250 or av.x < 0 or av.x > config.WIDTH:
                 success = True
                 if verbose:
                     print(f"  [SUCCESS at step {steps}]")
                 break
         
-        # Calculate metrics
+
         time_seconds = steps / config.FPS
         
         return {
@@ -229,14 +223,13 @@ def simulator_func(sweep_config: SweepConfig, verbose: bool = False) -> Dict[str
     This is the function that the parameter sweep calls.
     It takes a SweepConfig and returns metrics.
     """
-    # Convert to POMDP config
+   
     pomdp_config = config_to_pomdp_config(sweep_config)
-    
-    # Run simulation
+ 
     sim = HeadlessSimulator()
     result = sim.run_episode(pomdp_config, verbose=verbose)
     
-    # Return metrics in the format expected by sweep
+    
     return {
         'success_rate': result['success'],
         'collision_rate': result['collision'],
@@ -288,21 +281,20 @@ class SweepRunner:
             print(f"[{i}/{total}] Testing: p_exist={config.p_exist:.2f}, "
                   f"danger_weight={config.unseen_car_danger_weight:.0f}, "
                   f"danger_high={config.danger_high:.0f}")
-            
-            # Run multiple episodes
+     
             episode_metrics = []
             for ep in range(n_episodes):
                 metrics = simulator_func(config, verbose=False)
                 episode_metrics.append(metrics)
                 
-                # Print progress every 5 episodes
+         
                 if (ep + 1) % 5 == 0:
                     print(f"  ... episode {ep + 1}/{n_episodes}")
             
-            # Average metrics
+         
             avg_metrics = self._average_metrics(episode_metrics)
             
-            # Store result
+          
             self.results.append({
                 'config': asdict(config),
                 'metrics': avg_metrics
