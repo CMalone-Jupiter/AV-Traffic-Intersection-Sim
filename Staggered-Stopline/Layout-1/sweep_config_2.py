@@ -470,6 +470,121 @@ def run_baseline_sweep():
         # plot_results(df)
 
 
+def run_sweep_1_unseen_car():
+    """SWEEP 1: Unseen Car Model (36 configs, ~30 min)"""
+    print("\n" + "="*70)
+    print("SWEEP 1: UNSEEN CAR MODEL")
+    print("="*70)
+    
+    configs = grid_sweep({
+        'p_exist': [0.2, 0.3, 0.4],
+        'unseen_car_danger_weight': [25, 30, 35, 40],
+        'edge_detection_threshold': [40, 50, 60]
+    })
+    
+    print(f"Testing {len(configs)} configurations (~30 minutes)")
+    proceed = input("Continue? (y/n): ")
+    
+    if proceed.lower() == 'y':
+        runner = SweepRunner()
+        runner.run_sweep(configs, n_episodes=10)
+        runner.save("sweep1_unseen_car.json")
+        runner.print_summary()
+        df = analyze_results("sweep1_unseen_car.json")
+
+
+def run_sweep_2_danger_thresholds():
+    """SWEEP 2: Danger Thresholds (45 configs, ~40 min)"""
+    print("\n" + "="*70)
+    print("SWEEP 2: DANGER THRESHOLDS")
+    print("="*70)
+    
+    configs = grid_sweep({
+        'danger_high': [50, 55, 60, 65, 70],
+        'danger_medium': [25, 30, 35],
+        'visibility_high': [0.2, 0.3, 0.4]
+    })
+    
+    print(f"Testing {len(configs)} configurations (~40 minutes)")
+    proceed = input("Continue? (y/n): ")
+    
+    if proceed.lower() == 'y':
+        runner = SweepRunner()
+        runner.run_sweep(configs, n_episodes=10)
+        runner.save("sweep2_danger_thresholds.json")
+        runner.print_summary()
+        df = analyze_results("sweep2_danger_thresholds.json")
+
+
+def run_sweep_3_fov():
+    """SWEEP 3: FOV & Perception (81 configs, ~60 min)"""
+    print("\n" + "="*70)
+    print("SWEEP 3: FOV & PERCEPTION")
+    print("="*70)
+    
+    configs = grid_sweep({
+        'fov_penalty_low': [25, 30, 35],
+        'fov_penalty_medium': [10, 15, 20],
+        'fov_threshold_low': [0.3, 0.4, 0.5],
+        'fov_threshold_medium': [0.5, 0.6, 0.7]
+    })
+    
+    print(f"Testing {len(configs)} configurations (~60 minutes)")
+    proceed = input("Continue? (y/n): ")
+    
+    if proceed.lower() == 'y':
+        runner = SweepRunner()
+        runner.run_sweep(configs, n_episodes=10)
+        runner.save("sweep3_fov.json")
+        runner.print_summary()
+        df = analyze_results("sweep3_fov.json")
+
+
+def run_sweep_4_rewards():
+    """SWEEP 4: Rewards (54 configs, ~45 min)"""
+    print("\n" + "="*70)
+    print("SWEEP 4: REWARDS")
+    print("="*70)
+    
+    configs = grid_sweep({
+        'cost_stop': [-1, -5, -10],
+        'cost_creep': [-2, -2.5, -3],
+        'reward_go_low': [100, 150, 200],
+        'p_exist': [0.3, 0.4]
+    })
+    
+    print(f"Testing {len(configs)} configurations (~45 minutes)")
+    proceed = input("Continue? (y/n): ")
+    
+    if proceed.lower() == 'y':
+        runner = SweepRunner()
+        runner.run_sweep(configs, n_episodes=10)
+        runner.save("sweep4_rewards.json")
+        runner.print_summary()
+        df = analyze_results("sweep4_rewards.json")
+
+
+def run_sweep_5_timing():
+    """SWEEP 5: Decision Timing (36 configs, ~30 min)"""
+    print("\n" + "="*70)
+    print("SWEEP 5: DECISION TIMING")
+    print("="*70)
+    
+    configs = grid_sweep({
+        'min_steps_before_go': [2, 4, 6],
+        'max_info_gathering_steps': [30, 40, 50, 60],
+        'danger_high': [55, 60, 65]
+    })
+    
+    print(f"Testing {len(configs)} configurations (~30 minutes)")
+    proceed = input("Continue? (y/n): ")
+    
+    if proceed.lower() == 'y':
+        runner = SweepRunner()
+        runner.run_sweep(configs, n_episodes=10)
+        runner.save("sweep5_timing.json")
+        runner.print_summary()
+        df = analyze_results("sweep5_timing.json")
 
 if __name__ == "__main__":
     print("""
@@ -477,26 +592,33 @@ if __name__ == "__main__":
 ║         POMDP PARAMETER SWEEP - YOUR SIMULATION                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-IMPORTANT: Before running, make sure PhantomCar has vy attribute!
-Add this line to PhantomCar.__init__ in pomdp_unseen_cars_blocked_area_5.py:
-    self.vy = 0  # (after the line: self.vx = ...)
-
 Choose a sweep to run:
 
-1. Quick Test (6 configs, ~2-3 minutes)
-   - Tests: p_exist=[0.2,0.3,0.4] × danger_high=[60,70]
-   
-2. Baseline Sweep (36 configs, ~20-30 minutes)
-   - Tests: 4 key parameters with 2-3 values each
-
+1. Quick Test                    (6 configs,  ~5 min)
+2. Baseline Sweep                (36 configs, ~30 min)
+3. Sweep 1: Unseen Car Model     (36 configs, ~30 min) ⭐ RECOMMENDED
+4. Sweep 2: Danger Thresholds    (45 configs, ~40 min) ⭐ RECOMMENDED
+5. Sweep 3: FOV & Perception     (81 configs, ~60 min)
+6. Sweep 4: Rewards              (54 configs, ~45 min)
+7. Sweep 5: Decision Timing      (36 configs, ~30 min)
 
 """)
     
-    choice = input("Enter choice (1/2): ").strip()
+    choice = input("Enter choice (1-7): ").strip()
     
     if choice == '1':
         run_quick_test()
     elif choice == '2':
         run_baseline_sweep()
+    elif choice == '3':
+        run_sweep_1_unseen_car()
+    elif choice == '4':
+        run_sweep_2_danger_thresholds()
+    elif choice == '5':
+        run_sweep_3_fov()
+    elif choice == '6':
+        run_sweep_4_rewards()
+    elif choice == '7':
+        run_sweep_5_timing()
     else:
         print("Invalid choice. Run script again.")
