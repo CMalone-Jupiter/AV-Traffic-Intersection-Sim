@@ -594,13 +594,13 @@ if __name__ == "__main__":
 
 Choose a sweep to run:
 
-1. Quick Test                    (6 configs,  ~5 min)
-2. Baseline Sweep                (36 configs, ~30 min)
-3. Sweep 1: Unseen Car Model     (36 configs, ~30 min) ⭐ RECOMMENDED
-4. Sweep 2: Danger Thresholds    (45 configs, ~40 min) ⭐ RECOMMENDED
-5. Sweep 3: FOV & Perception     (81 configs, ~60 min)
-6. Sweep 4: Rewards              (54 configs, ~45 min)
-7. Sweep 5: Decision Timing      (36 configs, ~30 min)
+1. Quick Test                    (6 configs)
+2. Baseline Sweep                (36 configs)
+3. Sweep 1: Unseen Car Model     (36 configs) ⭐ RECOMMENDED
+4. Sweep 2: Danger Thresholds    (45 configs) ⭐ RECOMMENDED
+5. Sweep 3: FOV & Perception     (81 configs)
+6. Sweep 4: Rewards              (54 configs)
+7. Sweep 5: Decision Timing      (36 configs)
 
 """)
     
