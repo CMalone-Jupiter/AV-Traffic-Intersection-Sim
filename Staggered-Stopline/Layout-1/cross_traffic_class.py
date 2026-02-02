@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 import config
+import numpy as np
 
 
 class CrossTrafficCar:
@@ -10,7 +11,10 @@ class CrossTrafficCar:
         self.direction = direction
         self.speed = config.CROSS_SPEED
         self.current_speed = self.speed  # Current actual speed (can be reduced for braking)
-        self.max_speed = self.speed      # Maximum speed this car can go
+        if random.random() > config.CROSS_SPEEDING_CHANCE:
+            self.max_speed = self.speed      # Maximum speed this car can go
+        else:
+            self.max_speed = random.uniform(self.speed, self.speed+config.CROSS_SPEED_GAUSSIAN)
         self.turn_angle = None
         self.turn_danger = False
         self.screen = screen

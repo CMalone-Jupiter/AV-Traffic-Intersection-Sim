@@ -70,8 +70,8 @@ class UnseenCarPOMDPConfig:
     consider_collision_timing: bool = True
     critical_collision_time: float = 3.0
 
-    position_error = 0
-    speed_error = 0
+    position_error = 30
+    # speed_error = 0
     visible_range_error = 0
 
     def __post_init__(self):
@@ -450,7 +450,7 @@ def assess_collision_zone_danger(cross_traffic, av, blockers,
     #     safe_to_go = should_av_go_col_zone(phantom_cars, av, blockers)
     #     # print(f'[Phantom] Safe to go? {safe_to_go}')
     # else:
-    safe_to_go = should_av_go_col_zone(cross_for_check, av, blockers)
+    safe_to_go = should_av_go_col_zone(cross_for_check, av, blockers, pomdp_config)
         # print(f'[Normal] Safe to go? {safe_to_go}')
 
     danger = 50.0 if not safe_to_go else 0.0
