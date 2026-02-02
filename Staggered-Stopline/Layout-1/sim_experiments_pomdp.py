@@ -21,8 +21,14 @@ from pomdp_unseen_cars_blocked_area_5 import UnseenCarPOMDPAgent, should_av_go_p
 parser = argparse.ArgumentParser(description="Run pygame app with options")
 parser.add_argument("--blocker", action="store_true",
                     help="Add blocking vehicle to stop line")
+parser.add_argument("--left", action="store_true",
+                    help="Add left blocking objects")
+parser.add_argument("--right", action="store_true",
+                    help="Add right blocking objects")
 parser.add_argument("--epochs", type=int, default=10,
                     help="Number of experiment attempts")
+parser.add_argument("--traffic_flow", type=int, default=6480,
+                    help="The traffic flow to simulate (vehicles/hour)")
 parser.add_argument("--creep", action="store_true",
                     help="Include if AV should use creeping behaviour to improve FOV.")
 parser.add_argument("--av_direction", type=str, default="straight", choices=["straight", "left", "right"],
@@ -67,9 +73,9 @@ experiment_diagnostics = {
     "POMDP-Observation": []
 }
  
-def reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle):
-    time.sleep(1.5)
-    run_sim(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle)
+# def reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_blocker):
+#     time.sleep(1.5)
+#     run_sim(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_blocker)
 
 # Define a custom event
 MY_EVENT = pygame.USEREVENT + 1
@@ -80,19 +86,19 @@ def set_decision_timer(min_ms, max_ms):
     pygame.time.set_timer(MY_EVENT, delay, loops=1)  # fire once
  
  
-def run_sim(epochs, running, success, av_direction='straight', inch_behave=True, save_fails=False, include_stationary_vehicle=False):
+def run_sim(epochs, traffic_flow, running, success, av_direction='straight', inch_behave=True, save_fails=False, include_blocker=False, left_blocker=False, right_blocker=False):
     save_fails = save_fails
     running = True
     epoch = 0
-    save_dir = f'./Epochs-{epochs}-nochecks-blocker{include_stationary_vehicle}-av{av_direction}-creep{inch_behave}/'
+    save_dir = f'./Epochs-{epochs}-trafficflow-{traffic_flow}-nochecks-blocker{include_blocker}-left{left_blocker}-right{right_blocker}-av{av_direction}-creep{inch_behave}/'
     os.makedirs(save_dir, exist_ok=True)
 
     while epoch < epochs:
-        save_name = f"epoch-{epoch}_direction-{av_direction}_blocker-{include_stationary_vehicle}.csv"
+        save_name = f"epochs-{epochs}_trafficflow-{traffic_flow}_left-{left_blocker}_right-{right_blocker}.csv"
         print(f'[INIT] Saving Collisions: {save_fails}')
         print("[INIT] Initializing POMDP Agent...")
         # Initialize POMDP agent
-        pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=False, enable_visibility_check=False)
+        pomdp_agent = UnseenCarPOMDPAgent(model_unseen_cars=True, enable_visibility_check=True)
         pomdp_agent.verbose = False
         pomdp_agent.policy.verbose = False
         print(f"[INIT] POMDP Agent initialized")
@@ -107,13 +113,23 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
         frames = []
         start_record = False
 
-        if include_stationary_vehicle:
-            if random.randint(0, 1):
-                intersection_obstruction = blocker_vehicle_class.IntersectionObstruction(screen)
-                print('[INIT] Blocking object is right intersection corner obstruction')
-            else:
+        if include_blocker:
+            if left_blocker:
                 stationary_vehicle = blocker_vehicle_class.StationaryVehicle(screen)
                 print('[INIT] Blocking object is vehicle in adjacent left lane')
+
+            if right_blocker:
+                intersection_obstruction = blocker_vehicle_class.IntersectionObstruction(screen)
+                print('[INIT] Blocking object is right intersection corner obstruction')
+
+            if not left_blocker and not right_blocker:
+                print('[INIT] Randomising blocker')
+                if random.randint(0, 1):
+                    intersection_obstruction = blocker_vehicle_class.IntersectionObstruction(screen)
+                    print('[INIT] Blocking object is right intersection corner obstruction')
+                else:
+                    stationary_vehicle = blocker_vehicle_class.StationaryVehicle(screen)
+                    print('[INIT] Blocking object is vehicle in adjacent left lane')
 
         cross_traffic = []
         deciding = False
@@ -124,7 +140,7 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
         #     running = False
         #     print(f"[STATUS] Finished running {epochs} experiments!")
         #     print(f"[RESULTS] AV had a {(np.array(success).sum()/epochs)*100}% success rate trying to cross the intersection")
-        #     with open(f"{save_dir}/Experiment-Collision-Diagnostics_direction-{av_direction}_blocker-{include_stationary_vehicle}.pkl", "wb") as f:
+        #     with open(f"{save_dir}/Experiment-Collision-Diagnostics_direction-{av_direction}_blocker-{include_blocker}.pkl", "wb") as f:
         #         pickle.dump(experiment_diagnostics, f)
         #     np.savetxt(save_dir+save_name, np.array(success), delimiter=',')
         #     pygame.quit()
@@ -276,7 +292,7 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
 
                     print("[SAVING] Saving the screen recording from this collision")
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # mp4 codec
-                    out = cv2.VideoWriter(save_dir+f"epoch-{epoch}_for_epochs-{epochs}_direction-{av_direction}_blocker-{include_stationary_vehicle}.mp4", fourcc, 60, (config.WIDTH, config.HEIGHT))
+                    out = cv2.VideoWriter(save_dir+f"epoch-{epoch}_direction-{av_direction}_blocker-{include_blocker}.mp4", fourcc, 60, (config.WIDTH, config.HEIGHT))
                     for frame in frames:
                         bgr_frame = frame[:, :, ::-1]
                         out.write(bgr_frame)
@@ -287,7 +303,7 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
                 epoch += 1
 
                 running = False
-                # reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle)
+                # reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_blocker)
                 # break
     
             # Check for success (AV fully exited top of screen)
@@ -297,7 +313,7 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
                 epoch += 1
                 frames.clear()
                 running = False
-                # reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle)
+                # reset_simulation(epoch, epochs, running, success, av_direction, inch_behave, save_fails, include_blocker)
                 # break
 
             av.draw()
@@ -348,7 +364,7 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
     # running = False
     print(f"[STATUS] Finished running {epochs} experiments!")
     print(f"[RESULTS] AV had a {(np.array(success).sum()/epochs)*100}% success rate trying to cross the intersection")
-    with open(f"{save_dir}/Experiment-Collision-Diagnostics_direction-{av_direction}_blocker-{include_stationary_vehicle}.pkl", "wb") as f:
+    with open(f"{save_dir}/Experiment-Diagnostics.pkl", "wb") as f:
         pickle.dump(experiment_diagnostics, f)
     np.savetxt(save_dir+save_name, np.array(success), delimiter=',')
     pygame.quit()
@@ -358,7 +374,10 @@ def run_sim(epochs, running, success, av_direction='straight', inch_behave=True,
 if __name__ == "__main__":
     # include_blocker = "--blocker" in sys.argv
     args = parser.parse_args()
+    config.TRAFFIC_FLOW = args.traffic_flow
     include_blocker = args.blocker
+    left_blocker = args.left
+    right_blocker = args.right
     save_fails = args.save_fails
     inch_behave = args.creep
     if include_blocker:
@@ -372,4 +391,4 @@ if __name__ == "__main__":
     success = []
     print(f"AV attempting to go {av_direction}, {epochs} times, {block} blocker")
 
-    run_sim(epochs, running, success, av_direction, inch_behave, save_fails, include_stationary_vehicle=include_blocker)
+    run_sim(epochs, config.TRAFFIC_FLOW, running, success, av_direction, inch_behave, save_fails, include_blocker, left_blocker, right_blocker)

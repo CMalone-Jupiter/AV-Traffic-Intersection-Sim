@@ -340,6 +340,7 @@ class PhantomCar:
         self.x = x
         self.y = y
         self.vx = config.CROSS_SPEED if direction == 'right' else -config.CROSS_SPEED
+        self.vy = 0
         self.rect = pygame.Rect(int(self.x), int(self.y), config.CAR_WIDTH, config.CAR_HEIGHT)
 
     def is_in_intersection(self) -> bool:
