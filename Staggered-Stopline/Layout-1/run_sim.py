@@ -10,13 +10,33 @@ import blocker_vehicle_class
 import cross_traffic_class
 import utils
 import ctypes
+import os
 
 on_off = ['OFF', 'ON']
 on_off_colour = [(255,0,0), (0,255,0)]
+
+if config.HEADERLESS:
+    os.environ["SDL_VIDEODRIVER"] = "dummy"
  
 pygame.init()
-screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-pygame.display.set_caption("AV Intersection Simulator")
+
+# ---------------- SCREEN SETUP ---------------- #
+if config.HEADERLESS:
+    screen = pygame.Surface((config.WIDTH, config.HEIGHT))
+
+    # Override display functions
+    pygame.display.flip = lambda: None
+    pygame.display.update = lambda *args, **kwargs: None
+
+    # Override common pygame.draw functions
+    pygame.draw.rect = lambda *args, **kwargs: None
+    pygame.draw.circle = lambda *args, **kwargs: None
+    pygame.draw.line = lambda *args, **kwargs: None
+
+else:
+    screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
+    pygame.display.set_caption("AV Intersection Simulator")
+
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 24)
 font_small = pygame.font.SysFont(None, 22)
