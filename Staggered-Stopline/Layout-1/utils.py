@@ -35,7 +35,7 @@ def travel_time(distance, v0, a, vmax):
 
     return t
 
-def get_fov_info(av, blockers):
+def get_fov_info(av, blockers, pomdp_config):
     """Get or compute FOV information with caching"""
     # Compute FOV info
     # fov_polygon = av.get_fov_polygon(blockers)
@@ -48,8 +48,8 @@ def get_fov_info(av, blockers):
         # fov_points = fov_polygon[1:]
         # left_x = min(pt[0] for pt in fov_points)
         # right_x = max(pt[0] for pt in fov_points)
-        left_x = float(max(0, visible_range_upper))
-        right_x = float(min(config.WIDTH, visible_range_lower))
+        left_x = np.random.normal(float(max(0, visible_range_upper)), pomdp_config.visible_range_error/3)
+        right_x = np.random.normal(float(min(config.WIDTH, visible_range_lower)), pomdp_config.visible_range_error/3)
         fov_width = right_x - left_x
         
         expected_fov_width = config.WIDTH * 0.5

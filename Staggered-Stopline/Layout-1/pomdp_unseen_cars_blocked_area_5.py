@@ -365,7 +365,7 @@ def analyze_blocked_areas(av, blockers, pomdp_config: UnseenCarPOMDPConfig = POM
     # left_x = min(pt[0] for pt in fov_points)
     # right_x = max(pt[0] for pt in fov_points)
     # fov_width = right_x - left_x
-    visibility_ratio, left_x, right_x, fov_width = get_fov_info(av, blockers)
+    visibility_ratio, left_x, right_x, fov_width = get_fov_info(av, blockers, pomdp_config)
 
     # expected_fov_width = config.WIDTH * 0.7
     expected_left = config.WIDTH * 0.15
