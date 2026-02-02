@@ -70,6 +70,10 @@ class UnseenCarPOMDPConfig:
     consider_collision_timing: bool = True
     critical_collision_time: float = 3.0
 
+    position_error = 0
+    speed_error = 0
+    visible_range_error = 0
+
     def __post_init__(self):
         if self.sensor_accuracy is None:
             self.sensor_accuracy = {

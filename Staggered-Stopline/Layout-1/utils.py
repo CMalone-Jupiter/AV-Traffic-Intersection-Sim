@@ -57,7 +57,7 @@ def get_fov_info(av, blockers):
     
     return visibility_ratio, left_x, right_x, fov_width
 
-def should_av_go_col_zone(cross_traffic, av, blocker):
+def should_av_go_col_zone(cross_traffic, av, blocker, pomdp_config):
 
     # visible_range_lower = visible_x_range_at_y(av, blocker, config.HEIGHT/2+config.LANE_WIDTH/2)[1]
     # visible_range_upper = visible_x_range_at_y(av, blocker, config.HEIGHT/2-config.LANE_WIDTH/2)[0]
@@ -96,6 +96,7 @@ def should_av_go_col_zone(cross_traffic, av, blocker):
 
     for car in cross_traffic:
         car.speed_check = (car.vx, car.vy)
+        car_position = np.random.normal(car.x, pomdp_config.position_error/3)
         if not is_car_in_fov(car, av, blocker):
             car.visible = False
             continue  # Ignore cars outside FOV
@@ -103,16 +104,16 @@ def should_av_go_col_zone(cross_traffic, av, blocker):
             return False
     
         if car.direction == 'left':
-            if car.drive_path != 'left' and (car.x+config.CAR_WIDTH) > config.LOWER_CONFLICT_ZONE[0]:
-                car_t1 = travel_time(abs(car.x-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
-                car_t2 = travel_time(abs((car.x+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+            if car.drive_path != 'left' and (car_position+config.CAR_WIDTH) > config.LOWER_CONFLICT_ZONE[0]:
+                car_t1 = travel_time(abs(car_position-config.LOWER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+                car_t2 = travel_time(abs((car_position+config.CAR_WIDTH)-config.LOWER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
 
                 if av.col_zone_times[0,0] < car_t2 and car_t1 < av.col_zone_times[0,1]:
                     return False
         else:
-            if car.drive_path != 'left' and car.x < config.UPPER_CONFLICT_ZONE[1]:
-                car_t1 = travel_time(abs((car.x+config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
-                car_t2 = travel_time(abs(car.x-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+            if car.drive_path != 'left' and car_position < config.UPPER_CONFLICT_ZONE[1]:
+                car_t1 = travel_time(abs((car_position+config.CAR_WIDTH)-config.UPPER_CONFLICT_ZONE[0]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
+                car_t2 = travel_time(abs(car_position-config.UPPER_CONFLICT_ZONE[1]), config.CROSS_SPEED, abs(car.acceleration), config.CROSS_SPEED)
 
                 if av.col_zone_times[1,0] < car_t2 and car_t1 < av.col_zone_times[1,1]:
                     return False
